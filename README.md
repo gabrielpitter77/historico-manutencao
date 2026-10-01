@@ -8,7 +8,7 @@ Painel: https://gabrielpitter77.github.io/historico-manutencao/
 ## Atualização diária (administrador)
 
 1. Baixe a planilha **Custos Despesas Analítico** do sistema.
-2. Abra `https://gabrielpitter77.github.io/historico-manutencao/?admin=1` e faça login.
+2. Abra `https://gabrielpitter77.github.io/historico-manutencao/` e faça login.
 3. Clique em **Carregar base** e escolha a planilha (30 s a 1 min).
 4. Confira os totais na mensagem verde e clique em **Gerar base.enc para publicar**.
 5. Neste repositório: **Add file → Upload files**, arraste o `base.enc` baixado (substitui o antigo) e clique em **Commit changes**.
