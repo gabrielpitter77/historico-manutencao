@@ -923,14 +923,14 @@ self.onmessage=function(e){
 };`;
 function sheetSrc(){return new TextDecoder().decode(Uint8Array.from(atob($('sheetjs').textContent.trim()),c=>c.charCodeAt(0)))}
 function blobURL(txt,type){return URL.createObjectURL(new Blob([txt],{type:type||'text/javascript'}))}
-const ADM={salt:'0958f24a5a61bcf3bef839cf4ca172a3',hash:'1cc99a025ea9adfda243317cbf09dfaa5c713c310def06dab556a774ffe06e3a'};let admOk=false;
+const ADM={salt:'4822fb4855c259f32cae98f408fa29a2',hash:'7239caec9c5f7dff30149c40c449b222886aee3d2e2c113614a4859b2f94e670'};let admOk=false;
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 try{admOk=sessionStorage.getItem('loc-adm')===ADM.hash}catch(e){}
 function admClose(){$('adm').classList.remove('on');$('admPw').value='';$('admErr').textContent=''}
 $('btnLoad').onclick=()=>{if(admOk){$('fileIn').click();return}$('adm').classList.add('on');setTimeout(()=>$('admPw').focus(),30)};
 $('admCancel').onclick=admClose;
 $('adm').onclick=e=>{if(e.target.id==='adm')admClose()};
-$('adm').querySelector('form').onsubmit=async e=>{e.preventDefault();const h=await sha(ADM.salt+':'+$('admPw').value.normalize('NFC').trim());
+$('adm').querySelector('form').onsubmit=async e=>{e.preventDefault();const h=await sha(ADM.salt+':'+$('admPw').value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim());
   if(h!==ADM.hash){$('admErr').textContent='Senha incorreta.';$('admPw').value='';$('admPw').focus();return}
   admOk=true;try{sessionStorage.setItem('loc-adm',h)}catch(e){}admClose();$('fileIn').click()};
 $('fileIn').onchange=async e=>{
