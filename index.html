@@ -69,6 +69,10 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .vt thead th:hover{color:var(--amber)}
 .vt thead th.num{text-align:right}
 .vt thead th .ar{color:var(--amber)}
+.vt thead th[draggable]{cursor:grab}
+.vt thead th.dragging{opacity:.35}
+.vt thead th.dropL{box-shadow:inset 3px 0 0 var(--amber)}
+.vt thead th.dropR{box-shadow:inset -3px 0 0 var(--amber)}
 .vt td{padding:0 8px;height:26px;white-space:nowrap;border-bottom:1px solid #1B2438;max-width:300px;overflow:hidden;text-overflow:ellipsis;color:var(--text2)}
 .vt td.num{text-align:right;color:var(--text)}
 .vt tbody tr:hover td{background:var(--amber-dim)}
@@ -152,7 +156,7 @@ body:not(.admin) .adm{display:none!important}
   </div>
 
   <section class="view on" id="v-itens">
-    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><span id="cntItens"></span><div class="sp"><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
+    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><span class="note">Arraste o título de uma coluna para mudá-la de lugar.</span><div class="sp"><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
     <div class="vt" id="vtItens"></div>
   </section>
 
@@ -497,18 +501,34 @@ function kpis(){
 
 // ================= tabela virtual =================
 function VT(el,cols,getRows,opt){
-  opt=opt||{};const RH=26;let sk=null,dir=1;
-  const head=()=>`<table><thead><tr>${cols.map((c,j)=>`<th data-j="${j}" class="${c.num?'num':''}">${esc(c.h)}${sk===j?'<span class="ar"> '+(dir>0?'▲':'▼')+'</span>':''}</th>`).join('')}</tr></thead><tbody></tbody></table>`;
-  let rows=[];
-  function setHead(){el.innerHTML=head();el.querySelectorAll('th').forEach(th=>th.onclick=()=>{const j=+th.dataset.j;dir=sk===j?-dir:(cols[j].num?-1:1);sk=j;sortRows();setHead();draw()});}
-  function sortRows(){if(sk==null)return;const c=cols[sk];const arr=Array.from(rows);const kv=new Map();arr.forEach(r=>kv.set(r,c.v(r)));arr.sort((a,b)=>{const x=kv.get(a),y=kv.get(b);if(x==null||x==='')return 1;if(y==null||y==='')return -1;return (x<y?-1:x>y?1:0)*dir});rows=arr}
-  function draw(){const tb=el.querySelector('tbody');const n=rows.length;const st=el.scrollTop;const vis=Math.ceil((el.clientHeight||600)/RH)+12;const s=Math.max(0,Math.floor(st/RH)-6),e=Math.min(n,s+vis);
-    let h=`<tr style="height:${s*RH}px"></tr>`;for(let r=s;r<e;r++){const row=rows[r];h+=`<tr data-r="${r}" class="${opt.click?'click':''}${opt.sel&&opt.sel(row)?' sel':''}">`+cols.map(c=>{const v=c.v(row);const f=c.f?c.f(v,row):v==null?'':esc(v);const cls=(c.num?'num':'')+(c.neg&&v<0?' neg':'');return `<td class="${cls}"${c.title?` title="${esc(v??'')}"`:''}>${f}</td>`}).join('')+'</tr>'}
+  opt=opt||{};const RH=26;let sortC=null,dir=1,rows=[];
+  const H=cols.map(c=>c.h),byH=new Map(cols.map(c=>[c.h,c])),LS='loc-vt-'+(opt.key||el.id);
+  let order=H.slice(),hidden=new Set(opt.hidden||[]);
+  try{const s=JSON.parse(localStorage.getItem(LS)||'null');if(s&&Array.isArray(s.order)){const k=s.order.filter(h=>byH.has(h));order=k.concat(H.filter(h=>!k.includes(h)));if(Array.isArray(s.hidden))hidden=new Set(s.hidden.filter(h=>byH.has(h)))}}catch(e){}
+  const save=()=>{try{localStorage.setItem(LS,JSON.stringify({order,hidden:[...hidden]}))}catch(e){}};
+  let vis=[];const calc=()=>{vis=order.filter(h=>!hidden.has(h)).map(h=>byH.get(h))};calc();
+  function setHead(){
+    el.innerHTML=`<table><thead><tr>${vis.map((c,j)=>`<th data-j="${j}" draggable="true" title="Arraste para mover a coluna · clique para ordenar" class="${c.num?'num':''}">${esc(c.h)}${sortC===c?'<span class="ar"> '+(dir>0?'▲':'▼')+'</span>':''}</th>`).join('')}</tr></thead><tbody></tbody></table>`;
+    let from=null;const ths=[...el.querySelectorAll('th')];const clr=()=>ths.forEach(x=>x.classList.remove('dragging','dropL','dropR'));
+    ths.forEach(th=>{
+      th.onclick=()=>{const c=vis[+th.dataset.j];dir=sortC===c?-dir:(c.num?-1:1);sortC=c;sortRows();setHead();draw()};
+      th.ondragstart=e=>{from=+th.dataset.j;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',vis[from].h)}catch(_){}th.classList.add('dragging')};
+      th.ondragend=()=>{from=null;clr()};
+      th.ondragover=e=>{if(from==null)return;e.preventDefault();e.dataTransfer.dropEffect='move';const r=th.getBoundingClientRect(),after=e.clientX>r.left+r.width/2;ths.forEach(x=>x.classList.remove('dropL','dropR'));th.classList.add(after?'dropR':'dropL')};
+      th.ondrop=e=>{e.preventDefault();if(from==null)return;const r=th.getBoundingClientRect(),after=e.clientX>r.left+r.width/2;const fh=vis[from].h,th2=vis[+th.dataset.j].h;from=null;clr();if(fh===th2)return;
+        order=order.filter(h=>h!==fh);order.splice(order.indexOf(th2)+(after?1:0),0,fh);save();calc();setHead();draw()};
+    });
+  }
+  function sortRows(){if(!sortC)return;const c=sortC;const arr=Array.from(rows);const kv=new Map();arr.forEach(r=>kv.set(r,c.v(r)));arr.sort((a,b)=>{const x=kv.get(a),y=kv.get(b);if(x==null||x==='')return 1;if(y==null||y==='')return -1;return (x<y?-1:x>y?1:0)*dir});rows=arr}
+  function draw(){const tb=el.querySelector('tbody');if(!tb)return;const n=rows.length;const st=el.scrollTop;const nv=Math.ceil((el.clientHeight||600)/RH)+12;const s=Math.max(0,Math.floor(st/RH)-6),e=Math.min(n,s+nv);
+    let h=`<tr style="height:${s*RH}px"></tr>`;for(let r=s;r<e;r++){const row=rows[r];h+=`<tr data-r="${r}" class="${opt.click?'click':''}${opt.sel&&opt.sel(row)?' sel':''}">`+vis.map(c=>{const v=c.v(row);const f=c.f?c.f(v,row):v==null?'':esc(v);const cls=(c.num?'num':'')+(c.neg&&v<0?' neg':'');return `<td class="${cls}"${c.title?` title="${esc(v??'')}"`:''}>${f}</td>`}).join('')+'</tr>'}
     h+=`<tr style="height:${(n-e)*RH}px"></tr>`;tb.innerHTML=h}
   el.onscroll=()=>requestAnimationFrame(draw);
   el.onclick=e=>{const tr=e.target.closest('tr[data-r]');if(tr&&opt.click)opt.click(rows[+tr.dataset.r])};
   setHead();
-  return {refresh(){rows=getRows();sortRows();el.scrollTop=0;draw()},draw,count:()=>rows.length};
+  return {refresh(){rows=getRows();sortRows();el.scrollTop=0;draw()},draw,count:()=>rows.length,cols:()=>vis,all:()=>cols,isHidden:h=>hidden.has(h),
+    setHidden(h,b){if(b)hidden.add(h);else hidden.delete(h);save();calc();setHead();draw()},
+    reset(){order=H.slice();hidden=new Set(opt.hidden||[]);try{localStorage.removeItem(LS)}catch(e){}calc();setHead();draw()}};
 }
 const cM=(v)=>v==null?'':fmtM.format(v),cN=v=>v==null?'':fmtN.format(v),cI=v=>v==null?'':fmtI.format(v),cP=v=>v==null||!isFinite(v)?'—':pct(v),cD=v=>dStr(v);
 
@@ -516,22 +536,31 @@ const cM=(v)=>v==null?'':fmtM.format(v),cN=v=>v==null?'':fmtN.format(v),cI=v=>v=
 let vtI;
 function buildItemsTable(){
   const C=[
-    {h:'Placa',v:i=>val('placa',i)},{h:'Marca',v:i=>val('marca',i)},{h:'Modelo',v:i=>val('modelo',i),title:1},
-    ...(has.gveic?[{h:'Grupo veículo',v:i=>val('gveic',i)}]:[]),
-    {h:'Cliente',v:i=>val('cliente',i),title:1},{h:'Código OS',v:i=>val('os',i)},
-    {h:'Abertura',v:i=>val('abert',i),f:cD},{h:'Fechamento',v:i=>val('fech',i),f:cD},
+    {h:'Placa',v:i=>val('placa',i)},{h:'Modelo',v:i=>val('modelo',i),title:1},{h:'Cliente',v:i=>val('cliente',i),title:1},
+    {h:'Código OS',v:i=>val('os',i)},{h:'Abertura',v:i=>val('abert',i),f:cD},{h:'Fechamento',v:i=>val('fech',i),f:cD},
+    {h:'Produto',v:i=>val('produto',i),title:1},{h:'KM',num:1,v:i=>val('km',i),f:cI},{h:'Quantidade',num:1,v:i=>val('qtd',i),f:cN},
+    {h:'Valor unitário',num:1,v:i=>val('vunit',i),f:cM},{h:'Fornecedor',v:i=>val('forn',i),title:1},
+    {h:'Marca',v:i=>val('marca',i)},...(has.gveic?[{h:'Grupo veículo',v:i=>val('gveic',i)}]:[]),
     {h:'Dias OS',num:1,v:i=>{const a=F.abert[i],f=has.fech?F.fech[i]:-1;return a<0?null:(f<0?today:f)-a}},
     {h:'Tipo',v:i=>val('tipo',i),f:v=>v?`<span class="tag ${/corret/i.test(v)?'c':'p'}">${esc(v)}</span>`:''},
-    {h:'Grupo despesa',v:i=>val('gdesp',i),title:1},{h:'Produto',v:i=>val('produto',i),title:1},
-    {h:'KM',num:1,v:i=>val('km',i),f:cI},{h:'Qtd',num:1,v:i=>val('qtd',i),f:cN},{h:'Valor unit.',num:1,v:i=>val('vunit',i),f:cM},
+    {h:'Grupo despesa',v:i=>val('gdesp',i),title:1},
     {h:'Custo total',num:1,v:i=>val('total',i),f:cM},{h:'Reembolso',num:1,v:i=>val('reemb',i),f:cM},{h:'Custo líquido',num:1,neg:1,v:i=>num('total',i)-num('reemb',i),f:cM},
-    {h:'Fornecedor',v:i=>val('forn',i),title:1},
     ...(has.fcidade?[{h:'Cidade forn.',v:i=>val('fcidade',i)}]:[]),...(has.fuf?[{h:'UF',v:i=>val('fuf',i)}]:[]),
     ...(has.femail?[{h:'E-mail forn.',v:i=>val('femail',i)}]:[]),...(has.crazao?[{h:'Cliente (razão)',v:i=>val('crazao',i),title:1}]:[]),
     ...(has.inserido?[{h:'Inserido por',v:i=>val('inserido',i)}]:[])
   ];
-  buildItemsTable.cols=C;
-  vtI=VT($('vtItens'),C,()=>idxI);
+  const HID=['Marca','Grupo veículo','Dias OS','Tipo','Grupo despesa','Custo total','Reembolso','Custo líquido','Cidade forn.','UF','E-mail forn.','Cliente (razão)','Inserido por'];
+  vtI=VT($('vtItens'),C,()=>idxI,{key:'itens-v2',hidden:HID});
+  buildColPick();
+}
+function buildColPick(){
+  const el=$('colPick'),pop=el.querySelector('.pop'),btn=el.querySelector('button');
+  const paint=()=>{pop.innerHTML='<div class="acts"><button class="btn" data-a="reset">Restaurar padrão</button></div><div class="note" style="margin-bottom:6px">Marque as colunas visíveis. Para mudar a ordem, arraste o título da coluna na tabela.</div>'+vtI.all().map(c=>`<label><input type="checkbox" data-h="${esc(c.h)}" ${vtI.isHidden(c.h)?'':'checked'}>${esc(c.h)}</label>`).join('');
+    pop.querySelectorAll('input[type=checkbox]').forEach(b=>b.onchange=()=>vtI.setHidden(b.dataset.h,!b.checked));
+    pop.querySelector('[data-a=reset]').onclick=()=>{vtI.reset();paint()}};
+  paint();
+  btn.onclick=e=>{e.stopPropagation();const was=el.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was){paint();el.classList.add('open')}};
+  pop.onclick=e=>e.stopPropagation();
 }
 const pfI=$('pfItens');
 function prodFilterItems(){const t=pfI.value.trim().toLowerCase();if(!t||!has.produto){idxI=idx;return}const L=Dt.produto.map(v=>String(v||'').toLowerCase());const h=new Uint8Array(L.length);L.forEach((v,k)=>{if(v.includes(t))h[k]=1});idxI=idx.filter(i=>h[F.produto[i]])}
@@ -620,7 +649,7 @@ function renderModelo(){
   hbar($('chModelo'),show.map(a=>({label:a.name,value:mv(a),a,tip:`<b>${esc(a.name)}</b><br>Veículos: ${fmtI.format(a.nv)} · OS: ${fmtI.format(a.nos)}<br>Custo total: ${fmtM.format(a.tot)}<br>Reembolso: ${fmtM.format(a.re)}<br>Custo líquido: ${fmtM.format(a.liq)}<br>Por veículo: ${fmtM.format(a.pv)} · Por OS: ${fmtM.format(a.po)}<br>% corretiva: ${pct(a.pc)}`+(a.sel?'<br><b>✓ selecionado</b>':'<br><span style="color:var(--muted)">clique para selecionar</span>')})),{click:d=>pickModelo(d.a),colorOf:d=>!anySel||d.a.sel?'var(--s1)':'#3A4560'});
   $('cntModelo').textContent=fmtI.format(rows.length)+(grp==='marca'?' marcas':' modelos');
   if(!vtMod||vtMod._g!==grp){
-    vtMod=VT($('vtModelo'),[{h:grp==='marca'?'Marca':'Modelo',v:a=>a.name,title:1},...(grp==='modelo'?[{h:'Marca',v:a=>a.marca==null||a.marca<0?'':Dt.marca[a.marca]}]:[]),{h:'Veículos',num:1,v:a=>a.nv,f:cI},{h:'OS',num:1,v:a=>a.nos,f:cI},{h:'Itens',num:1,v:a=>a.itens,f:cI},{h:'Custo total',num:1,v:a=>a.tot,f:cM},{h:'Reembolso',num:1,v:a=>a.re,f:cM},{h:'Custo líquido',num:1,neg:1,v:a=>a.liq,f:cM},{h:'Custo/veículo',num:1,v:a=>a.pv,f:cM},{h:'Custo/OS',num:1,v:a=>a.po,f:cM},{h:'% corretiva',num:1,v:a=>a.pc,f:cP}],()=>modRows.slice().sort((a,b)=>(b.sel-a.sel)||(b.tot-a.tot)),{click:pickModelo,sel:a=>a.sel});
+    vtMod=VT($('vtModelo'),[{h:grp==='marca'?'Marca':'Modelo',v:a=>a.name,title:1},...(grp==='modelo'?[{h:'Marca',v:a=>a.marca==null||a.marca<0?'':Dt.marca[a.marca]}]:[]),{h:'Veículos',num:1,v:a=>a.nv,f:cI},{h:'OS',num:1,v:a=>a.nos,f:cI},{h:'Itens',num:1,v:a=>a.itens,f:cI},{h:'Custo total',num:1,v:a=>a.tot,f:cM},{h:'Reembolso',num:1,v:a=>a.re,f:cM},{h:'Custo líquido',num:1,neg:1,v:a=>a.liq,f:cM},{h:'Custo/veículo',num:1,v:a=>a.pv,f:cM},{h:'Custo/OS',num:1,v:a=>a.po,f:cM},{h:'% corretiva',num:1,v:a=>a.pc,f:cP}],()=>modRows.slice().sort((a,b)=>(b.sel-a.sel)||(b.tot-a.tot)),{click:pickModelo,sel:a=>a.sel,key:'modelo-'+grp});
     vtMod._g=grp;
   }
   vtMod.refresh();
@@ -759,7 +788,7 @@ $('mesN').onchange=()=>{dirty.mensal=true;render('mensal')};
 ['repDias','osDias'].forEach(id=>$(id).onchange=()=>{dirty.alertas=true;render('alertas')});
 let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(['modelo','mensal','gdesp','prod'].includes(curTab)){dirty[curTab]=true;render(curTab)}},250)});
 $('csv').onclick=()=>{
-  const C=buildItemsTable.cols;const lines=[C.map(c=>c.h).join(';')];
+  const C=vtI.cols();const lines=[C.map(c=>c.h).join(';')];
   for(const i of idxI)lines.push(C.map(c=>{let v=c.v(i);if(v==null)return'';if(['Abertura','Fechamento'].includes(c.h))v=dStr(v);else if(typeof v==='number')v=String(v).replace('.',',');v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='historico_manutencao_filtrado.csv';a.click()};
 
