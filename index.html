@@ -70,6 +70,10 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .vt thead th.num{text-align:right}
 .vt thead th .ar{color:var(--amber)}
 .vt thead th[draggable]{cursor:grab}
+.vt th .rz{position:absolute;right:0;top:0;bottom:0;width:8px;cursor:col-resize;z-index:3}
+.vt th .rz:hover,.vt th .rz.on{background:var(--amber)}
+.vt table.fixed{table-layout:fixed;min-width:0}
+.vt table.fixed th,.vt table.fixed td{max-width:none;overflow:hidden;text-overflow:ellipsis}
 .vt thead th.dragging{opacity:.35}
 .vt thead th.dropL{box-shadow:inset 3px 0 0 var(--amber)}
 .vt thead th.dropR{box-shadow:inset -3px 0 0 var(--amber)}
@@ -155,7 +159,7 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
   </div>
 
   <section class="view on" id="v-itens">
-    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><span class="note">Arraste o título de uma coluna para mudá-la de lugar.</span><div class="sp"><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
+    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><span class="note">Arraste o título para mover a coluna · arraste a borda direita do título para ajustar a largura (duplo clique ajusta ao conteúdo).</span><div class="sp"><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
     <div class="vt" id="vtItens"></div>
   </section>
 
@@ -502,15 +506,28 @@ function kpis(){
 function VT(el,cols,getRows,opt){
   opt=opt||{};const RH=26;let sortC=null,dir=1,rows=[];
   const H=cols.map(c=>c.h),byH=new Map(cols.map(c=>[c.h,c])),LS='loc-vt-'+(opt.key||el.id);
-  let order=H.slice(),hidden=new Set(opt.hidden||[]);
-  try{const s=JSON.parse(localStorage.getItem(LS)||'null');if(s&&Array.isArray(s.order)){const k=s.order.filter(h=>byH.has(h));order=k.concat(H.filter(h=>!k.includes(h)));if(Array.isArray(s.hidden))hidden=new Set(s.hidden.filter(h=>byH.has(h)))}}catch(e){}
-  const save=()=>{try{localStorage.setItem(LS,JSON.stringify({order,hidden:[...hidden]}))}catch(e){}};
+  let order=H.slice(),hidden=new Set(opt.hidden||[]),widths={},noSort=0;
+  try{const s=JSON.parse(localStorage.getItem(LS)||'null');if(s&&Array.isArray(s.order)){const k=s.order.filter(h=>byH.has(h));order=k.concat(H.filter(h=>!k.includes(h)));if(Array.isArray(s.hidden))hidden=new Set(s.hidden.filter(h=>byH.has(h)));if(s.widths&&typeof s.widths==='object')widths=s.widths}}catch(e){}
+  const save=()=>{try{localStorage.setItem(LS,JSON.stringify({order,hidden:[...hidden],widths}))}catch(e){}};
+  const fixed=()=>Object.keys(widths).length>0,wOf=c=>widths[c.h]||(c.num?110:150);
   let vis=[];const calc=()=>{vis=order.filter(h=>!hidden.has(h)).map(h=>byH.get(h))};calc();
   function setHead(){
-    el.innerHTML=`<table><thead><tr>${vis.map((c,j)=>`<th data-j="${j}" draggable="true" title="Arraste para mover a coluna · clique para ordenar" class="${c.num?'num':''}">${esc(c.h)}${sortC===c?'<span class="ar"> '+(dir>0?'▲':'▼')+'</span>':''}</th>`).join('')}</tr></thead><tbody></tbody></table>`;
+    const fx=fixed(),tw=fx?vis.reduce((a,c)=>a+wOf(c),0):0;
+    el.innerHTML=`<table class="${fx?'fixed':''}" style="${fx?'width:'+tw+'px':''}">${fx?'<colgroup>'+vis.map(c=>`<col style="width:${wOf(c)}px">`).join('')+'</colgroup>':''}<thead><tr>${vis.map((c,j)=>`<th data-j="${j}" draggable="true" title="Arraste para mover · clique para ordenar · arraste a borda direita para ajustar a largura" class="${c.num?'num':''}">${esc(c.h)}${sortC===c?'<span class="ar"> '+(dir>0?'▲':'▼')+'</span>':''}<span class="rz" draggable="false" title="Arraste para ajustar a largura · duplo clique ajusta ao conteúdo"></span></th>`).join('')}</tr></thead><tbody></tbody></table>`;
     let from=null;const ths=[...el.querySelectorAll('th')];const clr=()=>ths.forEach(x=>x.classList.remove('dragging','dropL','dropR'));
     ths.forEach(th=>{
-      th.onclick=()=>{const c=vis[+th.dataset.j];dir=sortC===c?-dir:(c.num?-1:1);sortC=c;sortRows();setHead();draw()};
+      const rz=th.querySelector('.rz');
+      rz.onmousedown=e=>{e.preventDefault();e.stopPropagation();
+        if(!fixed()){ths.forEach((x,k)=>{widths[vis[k].h]=Math.ceil(x.getBoundingClientRect().width)+10});setHead();draw();const nth=el.querySelectorAll('th')[+th.dataset.j];nth.querySelector('.rz').onmousedown(e);return}
+        const j=+th.dataset.j,c=vis[j],tbl=el.querySelector('table'),col=tbl.querySelectorAll('col')[j],x0=e.clientX,w0=wOf(c),t0=parseFloat(tbl.style.width)||tbl.offsetWidth;rz.classList.add('on');document.body.style.cursor='col-resize';
+        const mv=ev=>{const w=Math.max(50,Math.min(900,w0+ev.clientX-x0));widths[c.h]=w;col.style.width=w+'px';tbl.style.width=(t0+w-w0)+'px'};
+        const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);rz.classList.remove('on');document.body.style.cursor='';noSort=Date.now();save()};
+        document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up)};
+      rz.onclick=e=>e.stopPropagation();
+      rz.ondblclick=e=>{e.stopPropagation();const j=+th.dataset.j;if(!fixed())ths.forEach((x,k)=>{widths[vis[k].h]=Math.ceil(x.getBoundingClientRect().width)+10});
+        let m=th.scrollWidth;el.querySelectorAll('tbody tr[data-r]').forEach(tr=>{const td=tr.children[j];if(td){const sp=document.createElement('span');sp.style.cssText='position:absolute;visibility:hidden;white-space:nowrap;font:'+getComputedStyle(td).font;sp.innerHTML=td.innerHTML;document.body.appendChild(sp);m=Math.max(m,sp.offsetWidth+18);sp.remove()}});
+        widths[vis[j].h]=Math.max(50,Math.min(700,Math.ceil(m)));noSort=Date.now();save();setHead();draw()};
+      th.onclick=()=>{if(Date.now()-noSort<300)return;const c=vis[+th.dataset.j];dir=sortC===c?-dir:(c.num?-1:1);sortC=c;sortRows();setHead();draw()};
       th.ondragstart=e=>{from=+th.dataset.j;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',vis[from].h)}catch(_){}th.classList.add('dragging')};
       th.ondragend=()=>{from=null;clr()};
       th.ondragover=e=>{if(from==null)return;e.preventDefault();e.dataTransfer.dropEffect='move';const r=th.getBoundingClientRect(),after=e.clientX>r.left+r.width/2;ths.forEach(x=>x.classList.remove('dropL','dropR'));th.classList.add(after?'dropR':'dropL')};
@@ -527,7 +544,7 @@ function VT(el,cols,getRows,opt){
   setHead();
   return {refresh(){rows=getRows();sortRows();el.scrollTop=0;draw()},draw,count:()=>rows.length,cols:()=>vis,all:()=>cols,isHidden:h=>hidden.has(h),
     setHidden(h,b){if(b)hidden.add(h);else hidden.delete(h);save();calc();setHead();draw()},
-    reset(){order=H.slice();hidden=new Set(opt.hidden||[]);try{localStorage.removeItem(LS)}catch(e){}calc();setHead();draw()}};
+    reset(){order=H.slice();hidden=new Set(opt.hidden||[]);widths={};try{localStorage.removeItem(LS)}catch(e){}calc();setHead();draw()}};
 }
 const cM=(v)=>v==null?'':fmtM.format(v),cN=v=>v==null?'':fmtN.format(v),cI=v=>v==null?'':fmtI.format(v),cP=v=>v==null||!isFinite(v)?'—':pct(v),cD=v=>dStr(v);
 
@@ -554,7 +571,7 @@ function buildItemsTable(){
 }
 function buildColPick(){
   const el=$('colPick'),pop=el.querySelector('.pop'),btn=el.querySelector('button');
-  const paint=()=>{pop.innerHTML='<div class="acts"><button class="btn" data-a="reset">Restaurar padrão</button></div><div class="note" style="margin-bottom:6px">Marque as colunas visíveis. Para mudar a ordem, arraste o título da coluna na tabela.</div>'+vtI.all().map(c=>`<label><input type="checkbox" data-h="${esc(c.h)}" ${vtI.isHidden(c.h)?'':'checked'}>${esc(c.h)}</label>`).join('');
+  const paint=()=>{pop.innerHTML='<div class="acts"><button class="btn" data-a="reset">Restaurar padrão</button></div><div class="note" style="margin-bottom:6px">Marque as colunas visíveis. Arraste o título para mudar a ordem e a borda direita do título para ajustar a largura. “Restaurar padrão” volta ordem, colunas e larguras.</div>'+vtI.all().map(c=>`<label><input type="checkbox" data-h="${esc(c.h)}" ${vtI.isHidden(c.h)?'':'checked'}>${esc(c.h)}</label>`).join('');
     pop.querySelectorAll('input[type=checkbox]').forEach(b=>b.onchange=()=>vtI.setHidden(b.dataset.h,!b.checked));
     pop.querySelector('[data-a=reset]').onclick=()=>{vtI.reset();paint()}};
   paint();
