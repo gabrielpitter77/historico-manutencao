@@ -130,6 +130,28 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .vt thead tr.flt input{width:100%;min-width:40px;background:var(--bg);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:11px;padding:3px 6px;border-radius:2px;height:24px}
 .vt thead tr.flt input:focus{outline:1px solid var(--amber)}
 .vt thead tr.flt input.on{border-color:var(--amber);background:rgba(245,166,35,.08)}
+.kbar{display:flex;align-items:center;gap:12px;margin:-4px 0 10px}
+.kbar .btn{height:28px;font-size:11px;padding:4px 10px}
+.kmini{display:none;font-family:var(--mono);font-size:12px;color:var(--text2)}
+body.kcol #kpis{display:none}
+body.kcol .kmini{display:inline}
+.kmini b{color:var(--text);font-weight:600}
+.kmini i{color:var(--muted);font-style:normal;margin:0 8px}
+.obsgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px;margin-top:10px}
+.obsgrid h3{margin:0 0 12px;font-size:14px}
+ul.obs{margin:0;padding-left:18px;color:var(--text2);font-size:13px;line-height:1.7}
+ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;border-radius:2px;color:var(--amber)}
+.srcbox{font-family:var(--mono);font-size:12px;color:var(--text2);line-height:1.9;margin-top:12px}
+.srcbox b{color:var(--text);font-weight:500}
+.upd.big{font-size:13px;padding:10px 14px;white-space:normal}
+#adm{position:fixed;inset:0;z-index:350;background:rgba(11,14,20,.8);display:none;align-items:center;justify-content:center;padding:16px}
+#adm.on{display:flex}
+#adm form{width:min(360px,100%);display:flex;flex-direction:column;gap:12px;padding:24px}
+#adm h3{margin:0;font-size:15px}
+#adm input{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 10px;font-family:var(--mono);font-size:14px;border-radius:2px}
+#adm input:focus{outline:1px solid var(--amber)}
+#adm .row{display:flex;gap:8px;justify-content:flex-end}
+#admErr{color:var(--red);font-family:var(--mono);font-size:12px;min-height:16px}
 #toast{position:fixed;bottom:20px;right:20px;z-index:250;background:var(--panel2);border:1px solid var(--green);padding:12px 14px;font-family:var(--mono);font-size:12px;max-width:420px;line-height:1.6;display:none}
 @media (max-width:1000px){.grid2{grid-template-columns:1fr}.filters .wide{grid-column:auto}}
 </style>
@@ -137,14 +159,16 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 <body>
 <div id="login"><form id="lgForm" class="bracket" autocomplete="on"><div class="brand">LOC <b>FROTAS</b></div><div class="lt">Histórico de Manutenção</div><label>Usuário<input id="lgU" autocomplete="username" spellcheck="false"></label><label>Senha<input id="lgP" type="password" autocomplete="current-password"></label><button class="btn amber" id="lgBtn" type="submit">Entrar</button><div id="lgErr"></div><div class="note">Os dados deste arquivo são criptografados e só abrem com o usuário e a senha corretos.</div></form></div>
 <div id="overlay" class="hide"><div class="brand">LOC <b>FROTAS</b></div><div class="bar"><i></i></div><div id="ovMsg">Carregando base…</div></div>
+<div id="adm"><form class="bracket" autocomplete="off"><h3>Senha do administrador</h3><div class="note">Necessária para carregar uma nova base no painel.</div><input type="password" id="admPw" placeholder="Senha de atualização" autocomplete="off"><div id="admErr"></div><div class="row"><button type="button" class="btn" id="admCancel">Cancelar</button><button type="submit" class="btn amber">Liberar</button></div></form></div>
 <div id="tip"></div><div id="toast"></div>
 <header>
   <div class="brand">LOC <b>FROTAS</b></div>
   <h1>Histórico de Manutenção · Custos e Despesas</h1>
-  <div class="src"><div id="updBadge" class="upd" style="display:none"></div><div id="srcInfo"></div><a class="btn" href="https://gabrielpitter77.github.io/painel-frota-parada-2/" style="text-decoration:none;display:inline-flex;align-items:center">← Central</a><button class="btn amber adm" id="btnLoad">Carregar base</button><button class="btn amber adm" id="btnPub" style="display:none">Gerar base.enc para publicar</button><button class="btn" id="btnOut">Sair</button><input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden></div>
+  <div class="src"><a class="btn" href="https://gabrielpitter77.github.io/painel-frota-parada-2/" style="text-decoration:none;display:inline-flex;align-items:center">← Central</a><button class="btn amber adm" id="btnLoad">Carregar base</button><button class="btn amber adm" id="btnPub" style="display:none">Gerar base.enc para publicar</button><button class="btn" id="btnOut">Sair</button><input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden></div>
 </header>
 <div id="localBadge">⚠ Você está vendo uma base LOCAL, ainda não publicada. Os analistas continuam vendo a base anterior até você subir o novo base.enc no GitHub.</div>
 <main>
+  <div class="kbar"><button class="btn" id="tglK">▲ Recolher indicadores</button><span id="kpiMini" class="kmini"></span></div>
   <div class="kpis" id="kpis"></div>
   <div class="filters bracket" id="fcard">
     <div class="f wide keep"><label>Busca (placa, OS, produto, fornecedor, cliente)</label><input id="q" placeholder="ex.: SIW0C82 ou correia"></div>
@@ -170,10 +194,11 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
     <div class="tab" data-v="forn">Por fornecedor</div>
     <div class="tab" data-v="cli">Por cliente</div>
     <div class="tab" data-v="alertas">Alertas e qualidade</div>
+    <div class="tab" data-v="obs">Observações</div>
   </div>
 
   <section class="view on" id="v-itens">
-    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><span class="note">Arraste o título para mover a coluna · arraste a borda direita do título para ajustar a largura (duplo clique ajusta ao conteúdo).</span><div class="sp"><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
+    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><div class="sp"><div class="upd updSlot" style="display:none"></div><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
     <div class="vt" id="vtItens"></div>
   </section>
 
@@ -228,6 +253,31 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
   <section class="view" id="v-cli">
     <div class="tbar"><span id="cntCli"></span><span class="note">% recuperado = reembolso ÷ custo total.</span></div>
     <div class="vt" id="vtCli"></div>
+  </section>
+
+  <section class="view" id="v-obs">
+    <div class="obsgrid">
+      <div class="bracket card"><h3>Atualização da base</h3><div class="upd updSlot big" style="display:none"></div><div id="srcInfo" class="srcbox"></div></div>
+      <div class="bracket card"><h3>Como usar a tabela de Itens de OS</h3><ul class="obs">
+        <li><b>Mover coluna:</b> arraste o título da coluna para o lugar desejado.</li>
+        <li><b>Largura:</b> arraste a borda direita do título. <b>Duplo clique</b> na borda ajusta ao conteúdo.</li>
+        <li><b>Ordenar:</b> clique no título (de novo inverte a ordem).</li>
+        <li><b>Filtro rápido por coluna:</b> digite no campo abaixo do título. Texto: contém (ex.: <code>siw0c82</code>, <code>pneus</code>). Datas: <code>2025</code>, <code>09/2025</code>. Números: <code>&gt;1000</code>, <code>&lt;50</code>, <code>&gt;=10</code>, <code>=0</code> ou faixa <code>100-500</code>. <b>Esc</b> limpa o campo.</li>
+        <li><b>Colunas ▾:</b> mostra/esconde colunas. “Restaurar padrão” volta ordem, colunas e larguras.</li>
+        <li><b>Exportar CSV:</b> exporta só as linhas filtradas, com as colunas visíveis na ordem da tela.</li>
+        <li>Ordem, largura e colunas ficam salvas no seu navegador.</li>
+      </ul></div>
+      <div class="bracket card"><h3>Filtros e indicadores</h3><ul class="obs">
+        <li>Os filtros do topo (grupo de despesa, tipo, ano, marca, modelo, cliente, datas) valem para <b>todas as abas</b>. Cada um aceita vários itens.</li>
+        <li><b>Recolher filtros</b> e <b>Recolher indicadores</b> liberam espaço na tela.</li>
+        <li>Clicar numa barra/linha de modelo, grupo ou cliente adiciona aquele item ao filtro.</li>
+      </ul></div>
+      <div class="bracket card"><h3>Cuidados com os números</h3><ul class="obs">
+        <li><b>Custo total</b> inclui tudo da planilha “Custos Despesas Analítico”: manutenção, mas também IPVA, licenciamento, fretes, avarias e taxas. Para ver só manutenção, use o filtro de Grupo de despesa (“Só manutenção”).</li>
+        <li><b>% corretiva</b> está muito alta porque muitas revisões estão lançadas como corretiva no sistema — veja a aba Alertas e qualidade.</li>
+        <li><b>Custo líquido</b> = custo total − reembolso. Negativo indica reembolso maior que o custo do item.</li>
+      </ul></div>
+    </div>
   </section>
 
   <section class="view" id="v-alertas">
@@ -432,7 +482,7 @@ let S=null,N=0,F={},Dt={},has={};
 let YEAR,MK,LOW={},CORR=-1,isCorr;
 let idx=new Uint32Array(0),idxI=new Uint32Array(0);
 const dirty={};let curTab='itens';
-const TABS=['itens','modelo','mensal','gdesp','prod','placas','forn','cli','alertas'];
+const TABS=['itens','modelo','mensal','gdesp','prod','placas','forn','cli','alertas','obs'];
 const val=(k,i)=>{const f=S.fields[k];if(!f)return null;const v=f.data[i];if(f.dict)return v<0?null:f.dict[v];if(f.type==='d')return v<0?null:v;if(f.type==='i')return v<0?null:v;return isNaN(v)?null:v};
 const num=(k,i)=>{const v=F[k]?F[k][i]:NaN;return isNaN(v)?0:v};
 
@@ -452,15 +502,16 @@ function setStore(st){
 function renderSrc(){
   const m=S.meta||{};let maxA=-1;const A=F.abert;for(let i=0;i<N;i++)if(A[i]>maxA)maxA=A[i];
   const when=m.carregadoEm?new Date(m.carregadoEm):null;
-  $('srcInfo').innerHTML=`Base: <span style="color:var(--text2)">${esc(m.arquivo||'—')}</span><br>${fmtI.format(N)} linhas · última OS aberta em ${dStr(maxA)}`;
+  $('srcInfo').innerHTML=`Planilha: <b>${esc(m.arquivo||'—')}</b><br>Linhas: <b>${fmtI.format(N)}</b><br>Última OS aberta em: <b>${dStr(maxA)}</b><br>Base gerada em: <b>${when?when.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}</b>`;
   renderSrc.when=when;updBadge();
 }
 function updBadge(){
-  const w=renderSrc.when,b=$('updBadge');if(!w||isNaN(w)){b.style.display='none';return}
+  const w=renderSrc.when;document.querySelectorAll('.updSlot').forEach(b=>paintBadge(b,w))}
+function paintBadge(b,w){if(!w||isNaN(w)){b.style.display='none';return}
   const min=Math.max(0,Math.round((Date.now()-w)/6e4)),h=min/60;
   const rel=min<1?'agora mesmo':min<60?'há '+min+' min':h<24?'há '+Math.floor(h)+' h'+(min%60?' '+(min%60)+' min':''):'há '+Math.floor(h/24)+' dia'+(Math.floor(h/24)>1?'s':'');
   const cls=h<26?'ok':h<72?'mid':'old';
-  b.className='upd '+cls;b.style.display='';
+  b.className='upd updSlot '+cls+(b.classList.contains('big')?' big':'');b.style.display='';
   b.innerHTML=`<span class="dot"></span><span><b>Atualizado em ${w.toLocaleDateString('pt-BR')} às ${w.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</b><br><span class="rel">${rel}${cls==='old'?' · base desatualizada':''}</span></span>`;
   b.title='Data e hora em que esta base foi gerada a partir da planilha';
 }
@@ -525,6 +576,7 @@ function kpis(){
   $('kpis').innerHTML=k('Itens',fmtI.format(idx.length),'de '+fmtI.format(N))+k('OS',fmtI.format(os.size))+k('Placas',fmtI.format(pl.size))+
     k('Custo total',short(tot),fmtM.format(tot))+k('Reembolso',short(re),fmtM.format(re))+k('Custo líquido',short(tot-re),fmtM.format(tot-re))+
     k('% recuperado',pct(tot?re/tot:NaN),'reembolso ÷ custo')+k('% corretiva',pct(tot?corr/tot:NaN),'do custo total');
+  $('kpiMini').innerHTML=`<b>${fmtI.format(idx.length)}</b> itens<i>·</i><b>${fmtI.format(os.size)}</b> OS<i>·</i><b>${fmtI.format(pl.size)}</b> placas<i>·</i>custo <b>${short(tot)}</b><i>·</i>reembolso <b>${short(re)}</b><i>·</i>líquido <b>${short(tot-re)}</b>`;
 }
 
 // ================= tabela virtual =================
@@ -831,12 +883,13 @@ function dqCards(){
 }
 
 // ================= navegação =================
-const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas};
+const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
 function go(t){curTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
 let tmr;q.oninput=()=>{clearTimeout(tmr);tmr=setTimeout(applyFilters,300)};
 ['fDe','fAte'].forEach(id=>$(id).onchange=applyFilters);
+(function(){let c=false;try{c=localStorage.getItem('loc-kcol')==='1'}catch(e){}const set=v=>{document.body.classList.toggle('kcol',v);$('tglK').textContent=v?'▼ Mostrar indicadores':'▲ Recolher indicadores';try{localStorage.setItem('loc-kcol',v?'1':'0')}catch(e){}};set(c);$('tglK').onclick=()=>set(!document.body.classList.contains('kcol'))})();
 $('tgl').onclick=()=>{const m=$('fcard').classList.toggle('min');$('tgl').textContent=m?'▼ Expandir filtros':'▲ Recolher filtros'};
 $('clr').onclick=()=>{q.value='';pfI.value='';pfR.value='';pfP.value='';['fDe','fAte'].forEach(id=>$(id).value='');for(const k in MS)if(MS[k])MS[k].reset();if(vtI)vtI.clearCF();applyFilters()};
 let tI;pfI.oninput=()=>{clearTimeout(tI);tI=setTimeout(()=>{if(curTab==='itens')renderItens();else dirty.itens=true},250)};
@@ -870,7 +923,16 @@ self.onmessage=function(e){
 };`;
 function sheetSrc(){return new TextDecoder().decode(Uint8Array.from(atob($('sheetjs').textContent.trim()),c=>c.charCodeAt(0)))}
 function blobURL(txt,type){return URL.createObjectURL(new Blob([txt],{type:type||'text/javascript'}))}
-$('btnLoad').onclick=()=>$('fileIn').click();
+const ADM={salt:'0958f24a5a61bcf3bef839cf4ca172a3',hash:'1cc99a025ea9adfda243317cbf09dfaa5c713c310def06dab556a774ffe06e3a'};let admOk=false;
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+try{admOk=sessionStorage.getItem('loc-adm')===ADM.hash}catch(e){}
+function admClose(){$('adm').classList.remove('on');$('admPw').value='';$('admErr').textContent=''}
+$('btnLoad').onclick=()=>{if(admOk){$('fileIn').click();return}$('adm').classList.add('on');setTimeout(()=>$('admPw').focus(),30)};
+$('admCancel').onclick=admClose;
+$('adm').onclick=e=>{if(e.target.id==='adm')admClose()};
+$('adm').querySelector('form').onsubmit=async e=>{e.preventDefault();const h=await sha(ADM.salt+':'+$('admPw').value.normalize('NFC').trim());
+  if(h!==ADM.hash){$('admErr').textContent='Senha incorreta.';$('admPw').value='';$('admPw').focus();return}
+  admOk=true;try{sessionStorage.setItem('loc-adm',h)}catch(e){}admClose();$('fileIn').click()};
 $('fileIn').onchange=async e=>{
   const file=e.target.files[0];e.target.value='';if(!file)return;
   overlay(`Carregando <b>${esc(file.name)}</b> (${(file.size/1e6).toFixed(1)} MB)…<br><span class="note">Planilhas grandes levam de 30 s a 1 min. A tela pode ficar parada — não feche.</span>`);
@@ -930,7 +992,7 @@ $('lgForm').onsubmit=async e=>{
     setStore(st);overlayOff();
   }catch(e){overlay('Erro ao carregar: '+esc(e.message||e),true)}
 };
-$('btnOut').onclick=()=>location.reload();
+$('btnOut').onclick=()=>{try{sessionStorage.removeItem('loc-adm')}catch(e){}location.reload()};
 $('btnPub').onclick=async()=>{
   if(!PENDING||!KEY)return;const b=$('btnPub');b.disabled=true;b.textContent='Gerando…';
   try{const gz=await gzip(PENDING);const enc=await encB(KEY,gz);const out=new Uint8Array(16+12+enc.ct.length);out.set(PAY.salt,0);out.set(enc.iv,16);out.set(enc.ct,28);
