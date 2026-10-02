@@ -152,6 +152,11 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
 #adm input:focus{outline:1px solid var(--amber)}
 #adm .row{display:flex;gap:8px;justify-content:flex-end}
 #admErr{color:var(--red);font-family:var(--mono);font-size:12px;min-height:16px}
+.seg{display:inline-flex;border:1px solid var(--navy2);border-radius:3px;overflow:hidden;height:32px}
+.seg button{background:var(--panel2);color:var(--text2);border:0;border-right:1px solid var(--navy2);padding:0 16px;font-family:var(--mono);font-size:12px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button:hover{color:var(--text);background:var(--navy)}
+.seg button.on{background:var(--amber);color:#111;font-weight:600}
 #toast{position:fixed;bottom:20px;right:20px;z-index:250;background:var(--panel2);border:1px solid var(--green);padding:12px 14px;font-family:var(--mono);font-size:12px;max-width:420px;line-height:1.6;display:none}
 @media (max-width:1000px){.grid2{grid-template-columns:1fr}.filters .wide{grid-column:auto}}
 </style>
@@ -199,7 +204,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   </div>
 
   <section class="view on" id="v-itens">
-    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><div class="sp"><div class="upd updSlot" style="display:none"></div><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
+    <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="seg" id="segBtns" title="Leves e pesados classificados pelo grupo do modelo (veja Observações)"><button type="button" data-s="0" class="on">Geral</button><button type="button" data-s="1">Leves</button><button type="button" data-s="2">Pesados</button></div><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><div class="sp"><div class="upd updSlot" style="display:none"></div><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
     <div class="vt" id="vtItens"></div>
   </section>
 
@@ -277,6 +282,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
         <li>Os filtros do topo (grupo de despesa, tipo, ano, marca, modelo, cliente, datas) valem para <b>todas as abas</b>. Cada um aceita vários itens.</li>
         <li><b>Recolher filtros</b> e <b>Recolher indicadores</b> liberam espaço na tela.</li>
         <li>Clicar numa barra/linha de modelo, grupo ou cliente adiciona aquele item ao filtro.</li>
+        <li><b>Geral / Leves / Pesados</b> (aba Itens de OS): vale para o painel inteiro. Pesados = grupos Caminhão, Máquina e Implemento; o resto é Leve. O grupo vem do modelo do veículo; modelos novos sem cadastro são classificados pelo nome (ex.: Atego, Axor, VM, Delivery, “6x4”).</li>
         <li><b>Clientes por carro:</b> uma linha por cliente × placa. “Atual = Sim” marca o cliente da OS mais recente da placa (o carro pode ter passado por vários clientes).</li>
       </ul></div>
       <div class="bracket card"><h3>Cuidados com os números</h3><ul class="obs">
@@ -499,6 +505,7 @@ function setStore(st){
   const A=F.abert;for(let i=0;i<N;i++){const d=A[i];if(d<0){YEAR[i]=0;MK[i]=-1;continue}const x=new Date(d*864e5);YEAR[i]=x.getUTCFullYear();MK[i]=x.getUTCFullYear()*12+x.getUTCMonth()}
   LOW={};for(const k of ['placa','produto','forn','cliente','crazao'])if(Dt[k])LOW[k]=Dt[k].map(v=>String(v??'').toLowerCase());
   CORR=has.tipo?Dt.tipo.findIndex(v=>/corret/i.test(v)):-1;
+  buildCls();
   isCorr=i=>has.tipo&&F.tipo[i]===CORR;
   vtMod=vtMes=vtG=vtP=vtPF=vtPl=vtFo=vtCl=vtR=vtL=vtCC=null;selProd=-1;
   buildFilters();buildItemsTable();
@@ -523,6 +530,23 @@ function paintBadge(b,w){if(!w||isNaN(w)){b.style.display='none';return}
   b.title='Data e hora em que esta base foi gerada a partir da planilha';
 }
 setInterval(()=>{if(S)updBadge()},60000);
+
+
+// ---- classificação Leves / Pesados (pelo grupo do modelo)
+const CATMAP={"10.160 drc 4x2":"Caminhão","15190 crm":"Caminhão","24280 6x2":"Caminhão","accelo 1016":"Caminhão","argo 1.0 flex":"Economico","argo drive 1.3 cvt":"Economico","atego 1719":"Caminhão","atego 2730 6x4":"Caminhão","axor 3131 6x4":"Caminhão","b1618":"Caminhão","byd dolphin":"Economico","byd yuan pro gs 290ev":"Economico","cargo 1723":"Caminhão","chevrolet/s10 wt ds4":"Caminhonete 4x4","constellation 17.260":"Caminhão","corolla xei 2.0l ffv cvt":"Intermediário","delivery 11.180 (compactador)":"Caminhão","ducato luxo 16l 2.2 diesel aut":"Minivan","duster 4x4 2.0":"Suv","duster intense automatico 1.6":"Suv","duster intense plus 1.6":"Intermediário","duster zen 1.6 4x2":"Suv","fiorino endurance":"Furgão","ford cargo 1723 kolector torqshift":"Caminhão","gol 1.0 l":"Economico","gol 1.6 mb5":"Intermediário","guindaste md45007":"Implemento","haval h9 exclusive td480":"Suv","hb20 1.0 vision":"Economico","hb20 at sedan 1.0 vision":"Intermediário","hiace pass dx":"Furgão","hilux 2.8 cd dsl power pack 4x4":"Caminhonete 4x4","hilux cd dsl 4x4 srv at (led":"Caminhonete 4x4","hilux cd dsl power pack at":"Caminhonete 4x4","hilux cd sr at 4x4":"Caminhonete 4x4","hilux cs dsl (chassi)":"Caminhonete 4x4","hilux cs dsl 4x4":"Caminhonete 4x4","implemento combate a incendio ap cap20000":"Implemento","jeep compass sport t":"Suv","ka hatch 1.0":"Economico","ka sedan 1.0":"Economico","ka sedan 1.5":"Intermediário","kia bongo 4x4 uk2500":"Caminhão","kwid zen 1.0":"Economico","l200 triton gl 2.4 cd 4x4":"Caminhonete 4x4","m polo torino":"Caminhão","m. benz / axor 3131 6x4":"Caminhão","m. benz atego 1729":"Caminhão","masca granmini":"Caminhão","master 2.3 dci":"Furgão","mercedes benz atego 1726/36":"Caminhão","minicarregadeira c/ rodas xc7 sr07 xcmg":"Máquina","mobi like":"Economico","onix hatch 1.0 mt":"Economico","oroch 1.6 4x2":"Pick-up Cd","oroch pro 1.6 flex 16v mec.":"Pick-up Cd","pa carregadeira lw300 - xcmg":"Máquina","polo comfortline ab 1.0":"Economico","polo ma":"Economico","polo sense vw":"Economico","polo track ma":"Economico","prancha - plataforma hidraulica":"Implemento","pa carregadeira":"Máquina","renault master minibus executive 16p l3h2":"Minivan","renegade 4x4 mcwillys 1.3t at9 flex awd":"Suv","renegade lgtd 4x2":"Suv","renegade mcaltitude 1.3t at6 flex fwd":"Suv","renegade moab 2.0":"Suv","renegade s t2704x4":"Suv","renegade sport t270 4x2":"Suv","renegade std 1.8":"Suv","renegade th t270":"Suv","retroescavadeira xc870br-2 xcmg":"Máquina","saveiro robust 1.6 cd":"Pick-up Cd","saveiro robust cs 1.6":"Pick-up Cs","spin 1.8 at ltz":"Minivan","spin 1.8 mt premier":"Minivan","spin 1.8l at lt7":"Minivan","sprinter 416 - sigvans":"Furgão","sprinter 417 k42b up5j":"Minivan","sprinter 517 microonibus":"Minivan","strada endurance 1.4 cs":"Pick-up Cs","strada endurance cd 1.4":"Pick-up Cd","strada endurance cs 1.3":"Pick-up Cs","strada freedom cd 1.3":"Pick-up Cd","strada ultra cd t200 at":"Pick-up Cd","strada working":"Pick-up Cs","t cross cl tsi":"Suv","t cross hl tsi":"Suv","t cross tsi":"Suv","tanque pipa impacto":"Implemento","toro endurance 9at 4x4":"Caminhonete 4x4","toro freedom 2.0":"Caminhonete 4x4","toro volcano 2.2 ds at9 4x4":"Caminhonete 4x4","toro volcano at d4":"Caminhonete 4x4","toro volcano turbo 2.0":"Caminhonete 4x4","toyota cross xrx hybrid":"Suv","virtus ab 1.0 tsi aut":"Economico","virtus cl tsi":"Economico","vm 270 6x4":"Caminhão","vm 290 6x4r":"Caminhão","vm 360 6x4r":"Caminhão","voyage 1.6":"Intermediário","vw - 18.260 crm 4x2":"Caminhão","vw 11.180 delivery 4x4":"Caminhão","vw 17.190 crm 4x2":"Caminhão","vw 17.210 crm 4x2":"Caminhão","vw 17.280 (4x2)":"Caminhão","vw 18.260 robust":"Caminhão","vw 23.230 crm":"Caminhão","vw 26.260 6x4":"Caminhão","vw 26.260 crm 6x2":"Caminhão","vw 26.280 crm 6x4":"Caminhão","vw delivery 11.180":"Caminhão","vw/27.320 crm 6x4":"Caminhão","vw/31.320 crm 6x4":"Caminhão","vw/31.330 crc":"Caminhão","yaris hb xl 1.5":"Intermediário"};
+const PESADOS=new Set(['Caminhão','Máquina','Implemento']);
+const HEAVY_RE=/\b(atego|axor|actros|accelo|constellation|delivery|cargo|tector|worker|scania|volvo fh|caminh|munck|guindaste|carregadeira|retroescavadeira|escavadeira|trator|motoniveladora|tanque|pipa|prancha)\b|\bvm\s?\d{3}|\b\d{2}\.\d{3}\b|\b[68]x[24]\b/i;
+let CLS=new Uint8Array(0),CATN=new Int16Array(0),CATD=[],SEG=0;
+function buildCls(){
+  const nk=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const M=Dt.modelo||[],gv=has.gveic?Dt.gveic:null;CATD=[];const cidx=new Map();
+  const per=M.map(m=>{let g=CATMAP[nk(m)]||null;let c;if(g)c=PESADOS.has(g)?2:1;else c=HEAVY_RE.test(m||'')?2:1;
+    const lab=g||(c===2?'Pesado (não cadastrado)':'Leve (não cadastrado)');if(!cidx.has(lab)){cidx.set(lab,CATD.length);CATD.push(lab)}return [c,cidx.get(lab)]});
+  CLS=new Uint8Array(N);CATN=new Int16Array(N);const MO=F.modelo;
+  for(let i=0;i<N;i++){const m=MO?MO[i]:-1;if(m<0){CLS[i]=0;CATN[i]=-1}else{CLS[i]=per[m][0];CATN[i]=per[m][1]}}
+}
+document.querySelectorAll('#segBtns button').forEach(b=>b.onclick=()=>{SEG=+b.dataset.s;document.querySelectorAll('#segBtns button').forEach(x=>x.classList.toggle('on',x===b));applyFilters()});
+function resetSeg(){SEG=0;document.querySelectorAll('#segBtns button').forEach(x=>x.classList.toggle('on',x.dataset.s==='0'))}
 
 // ================= filtros (seleção múltipla) =================
 const MSDEF=[['gdesp','msG','grupos',1],['tipo','msTipo','tipos'],['ano','msAno','anos'],['marca','msMarca','marcas'],['modelo','msModelo','modelos'],['cliente','msCli','clientes'],['gveic','msGveic','grupos'],['fuf','msUF','UFs']];
@@ -564,6 +588,7 @@ function applyFilters(){
   const out=new Uint32Array(N),outM=new Uint32Array(N);let n=0,nm=0;
   outer:for(let i=0;i<N;i++){
     for(let j=0;j<masks.length;j++){if(!masks[j][1][masks[j][0][i]])continue outer}
+    if(SEG&&CLS[i]!==SEG)continue;
     if(yM&&!yM[YEAR[i]])continue;
     if(de!=null&&(A[i]<0||A[i]<de))continue;if(ate!=null&&(A[i]<0||A[i]>ate))continue;
     if(t){let ok=osHit!=null&&OS[i]===osHit;if(!ok)for(let j=0;j<tk.length;j++){const h=hit[tk[j]];if(h&&h[F[tk[j]][i]]){ok=true;break}}if(!ok)continue}
@@ -572,7 +597,7 @@ function applyFilters(){
     out[n++]=i;
   }
   idx=out.slice(0,n);idxM=outM.slice(0,nm);
-  let nAct=(de!=null?1:0)+(ate!=null?1:0);for(const k in MS)if(MS[k]&&MS[k].mask)nAct++;
+  let nAct=(de!=null?1:0)+(ate!=null?1:0)+(SEG?1:0);for(const k in MS)if(MS[k]&&MS[k].mask)nAct++;
   $('nAct').textContent=nAct?nAct+' filtro(s) ativo(s)':'';
   kpis();TABS.forEach(k=>dirty[k]=true);render(curTab);
 }
@@ -658,7 +683,7 @@ function buildItemsTable(){
     {h:'Código OS',v:i=>val('os',i)},{h:'Abertura',date:1,v:i=>val('abert',i),f:cD},{h:'Fechamento',date:1,v:i=>val('fech',i),f:cD},
     {h:'Produto',fk:'produto',v:i=>val('produto',i),title:1},{h:'KM',num:1,v:i=>val('km',i),f:cI},{h:'Quantidade',num:1,v:i=>val('qtd',i),f:cN},
     {h:'Valor unitário',num:1,v:i=>val('vunit',i),f:cM},{h:'Fornecedor',fk:'forn',v:i=>val('forn',i),title:1},
-    {h:'Marca',fk:'marca',v:i=>val('marca',i)},...(has.gveic?[{h:'Grupo veículo',fk:'gveic',v:i=>val('gveic',i)}]:[]),
+    {h:'Marca',fk:'marca',v:i=>val('marca',i)},{h:'Categoria',v:i=>CATN[i]>=0?CATD[CATN[i]]:null},{h:'Leve/Pesado',v:i=>CLS[i]===2?'Pesado':CLS[i]===1?'Leve':null},...(has.gveic?[{h:'Grupo veículo',fk:'gveic',v:i=>val('gveic',i)}]:[]),
     {h:'Dias OS',num:1,v:i=>{const a=F.abert[i],f=has.fech?F.fech[i]:-1;return a<0?null:(f<0?today:f)-a}},
     {h:'Tipo',v:i=>val('tipo',i),f:v=>v?`<span class="tag ${/corret/i.test(v)?'c':'p'}">${esc(v)}</span>`:''},
     {h:'Grupo despesa',fk:'gdesp',v:i=>val('gdesp',i),title:1},
@@ -667,7 +692,7 @@ function buildItemsTable(){
     ...(has.femail?[{h:'E-mail forn.',v:i=>val('femail',i)}]:[]),...(has.crazao?[{h:'Cliente (razão)',v:i=>val('crazao',i),title:1}]:[]),
     ...(has.inserido?[{h:'Inserido por',v:i=>val('inserido',i)}]:[])
   ];
-  const HID=['Marca','Grupo veículo','Dias OS','Tipo','Grupo despesa','Custo total','Reembolso','Custo líquido','Cidade forn.','UF','E-mail forn.','Cliente (razão)','Inserido por'];
+  const HID=['Marca','Categoria','Leve/Pesado','Grupo veículo','Dias OS','Tipo','Grupo despesa','Custo total','Reembolso','Custo líquido','Cidade forn.','UF','E-mail forn.','Cliente (razão)','Inserido por'];
   vtI=VT($('vtItens'),C,()=>idxI,{key:'itens-v2',hidden:HID,colFilter:1,onFilter:updCntItens});
   buildColPick();
 }
@@ -931,7 +956,7 @@ let tmr;q.oninput=()=>{clearTimeout(tmr);tmr=setTimeout(applyFilters,300)};
 ['fDe','fAte'].forEach(id=>$(id).onchange=applyFilters);
 (function(){let c=false;try{c=localStorage.getItem('loc-kcol')==='1'}catch(e){}const set=v=>{document.body.classList.toggle('kcol',v);$('tglK').textContent=v?'▼ Mostrar indicadores':'▲ Recolher indicadores';try{localStorage.setItem('loc-kcol',v?'1':'0')}catch(e){}};set(c);$('tglK').onclick=()=>set(!document.body.classList.contains('kcol'))})();
 $('tgl').onclick=()=>{const m=$('fcard').classList.toggle('min');$('tgl').textContent=m?'▼ Expandir filtros':'▲ Recolher filtros'};
-$('clr').onclick=()=>{q.value='';pfI.value='';pfR.value='';pfP.value='';pfAP.value='';['fDe','fAte'].forEach(id=>$(id).value='');for(const k in MS)if(MS[k])MS[k].reset();if(vtI)vtI.clearCF();applyFilters()};
+$('clr').onclick=()=>{q.value='';pfI.value='';pfR.value='';pfP.value='';pfAP.value='';['fDe','fAte'].forEach(id=>$(id).value='');for(const k in MS)if(MS[k])MS[k].reset();if(vtI)vtI.clearCF();resetSeg();applyFilters()};
 let tI;pfI.oninput=()=>{clearTimeout(tI);tI=setTimeout(()=>{if(curTab==='itens')renderItens();else dirty.itens=true},250)};
 let tR;pfR.oninput=()=>{clearTimeout(tR);tR=setTimeout(()=>{filtRep();vtR&&vtR.refresh()},200)};
 let tAP;pfAP.oninput=()=>{clearTimeout(tAP);tAP=setTimeout(()=>{filtRep();vtR&&vtR.refresh();vtL&&vtL.refresh()},200)};
@@ -964,7 +989,7 @@ self.onmessage=function(e){
 };`;
 function sheetSrc(){return new TextDecoder().decode(Uint8Array.from(atob($('sheetjs').textContent.trim()),c=>c.charCodeAt(0)))}
 function blobURL(txt,type){return URL.createObjectURL(new Blob([txt],{type:type||'text/javascript'}))}
-const ADM={salt:'8135c2c7179c795894aad8ea9cbe2b58',hash:'f6035bc252535cbcfdb24134fb9405405c88ba7cadde772f4e5e9f8d5b6802c1'};let admOk=false;
+const ADM={salt:'bef1bcdf4eac69b2ee5aca695f1bbd5c',hash:'8aa0fc5b77c56cbc15faa85c8c5777efab9e007cd642cade760c3a56863a7520'};let admOk=false;
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 try{admOk=sessionStorage.getItem('loc-adm')===ADM.hash}catch(e){}
 function admClose(){$('adm').classList.remove('on');$('admPw').value='';$('admErr').textContent=''}
