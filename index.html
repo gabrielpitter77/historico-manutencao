@@ -97,6 +97,11 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .vt tbody tr:hover td{background:var(--amber-dim)}
 .vt tbody tr.click{cursor:pointer}
 .vt tbody tr.sel td{background:rgba(79,127,219,.18)}
+.vt tbody tr.msel td{background:rgba(245,166,35,.20)}
+.vt tbody tr.msel td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
+.vt tbody tr.ms{cursor:pointer;user-select:none}
+.vtsel{display:none;align-items:center;gap:14px;flex-wrap:wrap;padding:7px 12px;margin-bottom:6px;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.35);font-family:var(--mono);font-size:12px}
+.vtsel.on{display:flex}.vtsel b{color:var(--amber)}.vtsel .sp{margin-left:auto;display:flex;gap:8px}.vtsel .btn{padding:4px 10px;font-size:11px}
 .tag{display:inline-block;padding:1px 6px;font-size:10px;border-radius:2px;letter-spacing:.04em}
 .tag.c{background:rgba(242,84,91,.15);color:var(--red)}
 .tag.p{background:rgba(60,203,139,.15);color:var(--green)}
@@ -683,6 +688,18 @@ function VT(el,cols,getRows,opt){
   const fixed=()=>Object.keys(widths).length>0,wOf=c=>widths[c.h]||(c.num?120:160);
   let vis=[];const calc=()=>{vis=order.filter(h=>!hidden.has(h)).map(h=>byH.get(h))};calc();
   let base=[];const cf={};// cf[h]={txt,vals:Set|null,pred}
+  const MS=!opt.click;let msel=new Set(),anchor=-1,bar=null;
+  if(MS){bar=document.createElement('div');bar.className='vtsel';el.insertAdjacentElement('beforebegin',bar);
+    bar.onclick=e=>{const a=e.target.closest('[data-a]');if(!a)return;if(a.dataset.a==='clr')clearSel();else if(a.dataset.a==='cp')copySel()}}
+  function clearSel(){msel.clear();anchor=-1;draw();paintBar()}
+  function selRows(){const o=[];for(let k=0;k<rows.length;k++)if(msel.has(rows[k]))o.push(rows[k]);return o}
+  function paintBar(){if(!bar)return;const L=selRows();if(!L.length){bar.classList.remove('on');bar.innerHTML='';return}
+    const sums=cols.filter(c=>c.num&&(c.f===cM||c.f===cN)&&!/unit/i.test(c.h)).map(c=>{let t=0;for(const r of L){const v=c.v(r);if(typeof v==='number'&&isFinite(v))t+=v}return `${esc(c.h)}: <b>${c.f(t)}</b>`});
+    bar.innerHTML=`<span><b>${fmtI.format(L.length)}</b> linha(s) selecionada(s)</span>${sums.map(x=>'<span>'+x+'</span>').join('')}<span class="sp"><button type="button" class="btn" data-a="cp">Copiar (colar no Excel)</button><button type="button" class="btn" data-a="clr">Limpar seleção</button></span>`;bar.classList.add('on')}
+  function copySel(){const L=selRows();const txt=[vis.map(c=>c.h).join('\t')].concat(L.map(r=>vis.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)return dStr(v);if(typeof v==='number')return String(v).replace('.',',');return String(v).replace(/[\t\n]/g,' ')}).join('\t'))).join('\n');
+    const ok=()=>toast('<b style="color:var(--green)">'+fmtI.format(L.length)+' linha(s) copiada(s)</b><br>Cole no Excel com Ctrl+V.',4000);
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(ok,()=>fbCopy(txt,ok));else fbCopy(txt,ok)}
+  function fbCopy(t,ok){const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;left:-9999px';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok()}catch(e){}ta.remove()}
   const NUL='\u0000';
   const isFk=c=>!!(c.fk&&Dt[c.fk]&&F[c.fk]);
   const keyOf=(c,r)=>{if(isFk(c)){const d=F[c.fk][r];return d<0?-1:d}const v=c.v(r);return v==null||v===''?NUL:v};
@@ -703,7 +720,7 @@ function VT(el,cols,getRows,opt){
   function compile(h){const c=byH.get(h),x=cf[h];if(!c||!x)return;const a=mkPred(c,x.txt),b=mkValPred(c,x.vals);x.pred=a&&b?(i=>a(i)&&b(i)):(a||b)}
   const activeOf=h=>{const x=cf[h];return !!(x&&((x.txt&&x.txt.trim())||x.vals))};
   function filtered(exceptH){const ps=Object.keys(cf).filter(h=>h!==exceptH&&cf[h].pred).map(h=>cf[h].pred);return ps.length?base.filter(i=>{for(let k=0;k<ps.length;k++)if(!ps[k](i))return false;return true}):base}
-  function applyCF(){rows=filtered(null);sortRows();el.scrollTop=0;draw();
+  function applyCF(){rows=filtered(null);sortRows();el.scrollTop=0;if(msel.size){msel.clear();anchor=-1;paintBar()}draw();
     el.querySelectorAll('thead .fb').forEach(b=>b.classList.toggle('on',activeOf(b.dataset.h)));
     if(opt.onFilter)opt.onFilter(rows.length,base.length,Object.keys(cf).filter(activeOf).length)}
 
@@ -781,12 +798,18 @@ function VT(el,cols,getRows,opt){
   }
   function sortRows(){if(!sortC)return;const c=sortC;const arr=Array.from(rows);const kv=new Map();arr.forEach(r=>kv.set(r,c.v(r)));arr.sort((a,b)=>{const x=kv.get(a),y=kv.get(b);if(x==null||x==='')return 1;if(y==null||y==='')return -1;return (x<y?-1:x>y?1:0)*dir});rows=arr}
   function draw(){const tb=el.querySelector('tbody');if(!tb)return;const n=rows.length;const st=el.scrollTop;const nv=Math.ceil((el.clientHeight||600)/RH)+12;const s=Math.max(0,Math.floor(st/RH)-6),e=Math.min(n,s+nv);
-    let h=`<tr style="height:${s*RH}px"></tr>`;for(let r=s;r<e;r++){const row=rows[r];h+=`<tr data-r="${r}" class="${opt.click?'click':''}${opt.sel&&opt.sel(row)?' sel':''}">`+vis.map(c=>{const v=c.v(row);const f=c.f?c.f(v,row):v==null?'':esc(v);const cls=(c.num?'num':'')+(c.neg&&v<0?' neg':'');return `<td class="${cls}"${c.title?` title="${esc(v??'')}"`:''}>${f}</td>`}).join('')+'</tr>'}
+    let h=`<tr style="height:${s*RH}px"></tr>`;for(let r=s;r<e;r++){const row=rows[r];h+=`<tr data-r="${r}" class="${opt.click?'click':MS?'ms':''}${opt.sel&&opt.sel(row)?' sel':''}${MS&&msel.has(row)?' msel':''}">`+vis.map(c=>{const v=c.v(row);const f=c.f?c.f(v,row):v==null?'':esc(v);const cls=(c.num?'num':'')+(c.neg&&v<0?' neg':'');return `<td class="${cls}"${c.title?` title="${esc(v??'')}"`:''}>${f}</td>`}).join('')+'</tr>'}
     h+=`<tr style="height:${(n-e)*RH}px"></tr>`;tb.innerHTML=h}
   el.onscroll=()=>{if(Date.now()-openedAt>400)closeMenus();requestAnimationFrame(draw)};
-  el.onclick=e=>{const tr=e.target.closest('tr[data-r]');if(tr&&opt.click)opt.click(rows[+tr.dataset.r])};
+  el.onclick=e=>{const tr=e.target.closest('tr[data-r]');if(!tr)return;const ix=+tr.dataset.r;if(opt.click){opt.click(rows[ix]);return}if(!MS)return;
+    const row=rows[ix];
+    if(e.shiftKey&&anchor>=0){if(!(e.ctrlKey||e.metaKey))msel.clear();const a=Math.min(anchor,ix),b=Math.max(anchor,ix);for(let k=a;k<=b;k++)msel.add(rows[k])}
+    else if(e.ctrlKey||e.metaKey){if(msel.has(row))msel.delete(row);else msel.add(row);anchor=ix}
+    else{if(msel.size===1&&msel.has(row))msel.clear();else{msel.clear();msel.add(row)}anchor=ix}
+    draw();paintBar()};
+  if(MS)el.onmousedown=e=>{if(e.shiftKey&&e.target.closest('tr[data-r]'))e.preventDefault()};
   setHead();
-  return {refresh(){base=getRows();for(const h in cf)compile(h);applyCF()},draw,count:()=>rows.length,rows:()=>rows,
+  return {refresh(){base=getRows();for(const h in cf)compile(h);applyCF()},draw,clearSel:()=>{if(msel.size)clearSel()},count:()=>rows.length,rows:()=>rows,
     clearCF(){for(const h in cf)delete cf[h];closeMenus();setHead();applyCF()},cfActive:()=>Object.keys(cf).filter(activeOf).length,cols:()=>vis,all:()=>cols,isHidden:h=>hidden.has(h),
     setHidden(h,b){if(b)hidden.add(h);else hidden.delete(h);save();calc();setHead();draw()},
     reset(){order=H.slice();hidden=new Set(opt.hidden||[]);widths={};try{localStorage.removeItem(LS)}catch(e){}calc();setHead();draw()}};
