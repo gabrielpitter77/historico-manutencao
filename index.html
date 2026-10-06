@@ -179,6 +179,16 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
 .cmenu .cm-btns{display:flex;gap:6px;justify-content:flex-end}
 .cmenu .cm-btns .btn{height:28px;padding:4px 10px;font-size:11px}
 .cmenu .cm-more{font-size:10.5px}
+.batinfo{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6;margin:-4px 0 10px;padding:8px 12px;border-left:3px solid var(--amber);background:var(--panel)}
+.batinfo b{color:var(--text2)}
+#batHist h3{margin:0 0 8px;font-size:14px}
+#batHist table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
+#batHist th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:5px 8px}
+#batHist td{padding:5px 8px;border-bottom:1px solid #1B2438;color:var(--text2)}
+#batHist td.num{text-align:right}
+#batHist .tag{font-size:10.5px}
+#batHist .tag.r{background:rgba(79,127,219,.18);color:#9DB8F0}
+#batHist .tag.t{background:rgba(245,166,35,.15);color:var(--amber)}
 #toast{position:fixed;bottom:20px;right:20px;z-index:250;background:var(--panel2);border:1px solid var(--green);padding:12px 14px;font-family:var(--mono);font-size:12px;max-width:420px;line-height:1.6;display:none}
 @media (max-width:1000px){.grid2{grid-template-columns:1fr}.filters .wide{grid-column:auto}}
 </style>
@@ -214,6 +224,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   <div class="tabs" id="tabs">
     <div class="tab on" data-v="itens">Itens de OS</div>
     <div class="tab" data-v="km">Consulta de KM</div>
+    <div class="tab" data-v="bat">Baterias</div>
     <div class="tab" data-v="alertas">Alertas e qualidade</div>
     <div class="tab" data-v="modelo">Custo por modelo</div>
     <div class="tab" data-v="mensal">Evolução mensal</div>
@@ -289,6 +300,13 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="vt" id="vtKm"></div>
   </section>
 
+  <section class="view" id="v-bat">
+    <div class="tbar"><input class="pf" id="pfBat" placeholder="Pesquisar placa, modelo, cliente ou bateria…" style="width:300px"><div class="seg" id="batSeg"><button type="button" data-s="0" class="on">Todas</button><button type="button" data-s="1">Com troca</button><button type="button" data-s="2">Nunca trocou</button><button type="button" data-s="3">Com recarga/teste</button></div><span id="cntBat"></span><div class="sp"><button class="btn amber" id="csvBat">Exportar CSV</button></div></div>
+    <div class="batinfo"><b>Nunca trocou</b> = nenhuma troca de bateria nas OS da base desde a primeira OS da placa (coluna “Na base desde”). Pode ser a bateria original ou troca feita fora do sistema. <b>Troca</b> = produto que começa com “BATERIA” (sem carga, cabo, terminal, suporte, tampa, bateria de chave/controle, joystick, carregador, solução, fusível). <b>Recarga</b> = carga/recarga/carga lenta de bateria. <b>Teste</b> = teste/diagnóstico de bateria ou do sistema de carga e partida. Pesquise ou clique numa placa para ver o histórico completo.</div>
+    <div id="batHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
+    <div class="vt" id="vtBat"></div>
+  </section>
+
   <section class="view" id="v-clicar">
     <div class="tbar"><span id="cntCC"></span><span class="note">Uma linha por cliente × placa. “Atual” = cliente da OS mais recente daquela placa. Clique numa linha para ver os itens. Use a setinha ▾ de cada título para filtrar (seleção múltipla).</span><div class="sp"><button class="btn amber" id="csvCC">Exportar CSV</button></div></div>
     <div class="vt" id="vtCC"></div>
@@ -312,6 +330,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
         <li>Clicar numa barra/linha de modelo, grupo ou cliente adiciona aquele item ao filtro.</li>
         <li><b>Geral / Leves / Pesados</b> (aba Itens de OS): vale para o painel inteiro. Pesados = grupos Caminhão, Máquina e Implemento; o resto é Leve. O grupo vem do modelo do veículo; modelos novos sem cadastro são classificados pelo nome (ex.: Atego, Axor, VM, Delivery, “6x4”).</li>
         <li><b>Consulta de KM:</b> uma linha por placa com o último KM informado nas OS (e a data dessa leitura), modelo, cliente atual, Leve/Pesado e marca. Coluna <b>Maior KM</b>: a maior leitura já informada para a placa; fica âmbar com ⚠ quando o último KM é menor (hodômetro trocado ou KM digitado errado). Respeita os filtros do topo. KM abaixo de 10 (ex.: “1”, valor de preenchimento) ou acima de 2.000.000 é ignorado.</li>
+        <li><b>Baterias:</b> uma linha por placa com a última troca (data, KM, produto, valor, fornecedor, OS), dias e KM desde a troca, nº de trocas, última recarga e último teste. “Nunca trocou” = nenhuma troca nas OS da base desde a primeira OS da placa (“Na base desde”). Pesquise ou clique numa placa para ver o histórico completo de trocas, recargas e testes.</li>
         <li><b>Clientes por carro:</b> uma linha por cliente × placa. “Atual = Sim” marca o cliente da OS mais recente da placa (o carro pode ter passado por vários clientes).</li>
       </ul></div>
       <div class="bracket card"><h3>Cuidados com os números</h3><ul class="obs">
@@ -523,7 +542,7 @@ let S=null,N=0,F={},Dt={},has={};
 let YEAR,MK,LOW={},CORR=-1,isCorr;
 let idx=new Uint32Array(0),idxI=new Uint32Array(0);
 const dirty={};let curTab='itens';
-const TABS=['itens','km','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
+const TABS=['itens','km','bat','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
 const val=(k,i)=>{const f=S.fields[k];if(!f)return null;const v=f.data[i];if(f.dict)return v<0?null:f.dict[v];if(f.type==='d')return v<0?null:v;if(f.type==='i')return v<0?null:v;return isNaN(v)?null:v};
 const num=(k,i)=>{const v=F[k]?F[k][i]:NaN;return isNaN(v)?0:v};
 
@@ -536,7 +555,7 @@ function setStore(st){
   CORR=has.tipo?Dt.tipo.findIndex(v=>/corret/i.test(v)):-1;
   buildCls();
   isCorr=i=>has.tipo&&F.tipo[i]===CORR;
-  vtMod=vtMes=vtG=vtP=vtPF=vtPl=vtFo=vtCl=vtR=vtL=vtCC=vtKm=null;selProd=-1;
+  vtMod=vtMes=vtG=vtP=vtPF=vtPl=vtFo=vtCl=vtR=vtL=vtCC=vtKm=vtBat=null;selProd=-1;
   buildFilters();buildItemsTable();
   $('dlPlaca').innerHTML=Dt.placa?[...Dt.placa].filter(Boolean).sort().map(v=>`<option value="${esc(v)}">`).join(''):'';
   $('dlProd').innerHTML=has.produto?[...Dt.produto].filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(v=>`<option value="${esc(v)}">`).join(''):'';
@@ -1006,6 +1025,83 @@ $('csvKm').onclick=()=>{if(!vtKm)return;const C=vtKm.cols();const lines=[C.map(c
   for(const r of vtKm.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v);v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='consulta_km.csv';a.click()};
 
+// ---- baterias (última troca, recarga e teste por placa)
+const BAT_EXC=/carga|regarga|cabo|terminal|polo|suporte|tampa|chave|controle|alarme|joy ?stick|carregador|remoc|marcac|teste|protetor|ponteira|sensor|chupeta|auxilio|partida|diagnost|limpeza|instala|fixac|parafuso|abracadeira|presilha|borne|relogio|trava|isolador|chicote|rele|fu[sz]ivel|pilha|celular|radio|lanterna|rastreador|tablet|notebook|cinta|bandeja|desligamento|mao de obra|servico|solucao|conector|agua|solenoide/;
+let vtBat=null,batRows=[],batAll=[],batSeg=0,BATP=null,batSel=null,batEv=new Map();const pfBat=$('pfBat');
+// 1 = troca, 2 = recarga, 3 = teste
+function batMask(){if(BATP&&BATP.n===Dt.produto.length)return BATP.m;const m=new Uint8Array(Dt.produto.length);
+  Dt.produto.forEach((v,j)=>{const s=String(v||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+    if(/^bateri/.test(s)&&!BAT_EXC.test(s))m[j]=1;
+    else if(/bateri/.test(s)&&/(^|\s)(re|reg)?carga|recarga|regarga/.test(s)&&!/carregador|solenoide|sistema/.test(s))m[j]=2;
+    else if((/bateri/.test(s)&&/teste|test|diagnost|analise|medic|verific|laudo/.test(s))||/sistema de carga|carga e partida/.test(s))m[j]=3});
+  BATP={n:Dt.produto.length,m};return m}
+function renderBat(){
+  if(!has.produto){$('cntBat').textContent='A base não tem a coluna Produto.';return}
+  const A=F.abert,K=F.km,PL=F.placa,PR=F.produto,T=F.total,Q=F.qtd,OS=F.os,BM=batMask(),m=new Map();batEv=new Map();
+  const okK=k=>isFinite(k)&&k>=10&&k<2e6;
+  for(const i of idx){
+    const p=PL[i],a=A[i];let r=m.get(p);if(!r){r={p,last:-1,li:-1,first:Infinity,km:null,kmD:-1,b:null,rec:null,tst:null,nB:new Set(),nR:new Set(),nT:new Set()};m.set(p,r)}
+    if(a>r.last||(a===r.last&&OS[i]>OS[r.li])){r.last=a;r.li=i}
+    if(a>=0&&a<r.first)r.first=a;
+    const k=K?K[i]:NaN;if(okK(k)&&(a>r.kmD||(a===r.kmD&&k>r.km))){r.km=k;r.kmD=a}
+    const pd=PR[i];if(pd<0)continue;const ty=BM[pd];if(!ty)continue;
+    const ev={ty,a,os:OS[i],km:okK(k)?k:null,prod:Dt.produto[pd],val:T[i]||0,qtd:Q?(Q[i]||0):0,forn:F.forn&&F.forn[i]>=0?Dt.forn[F.forn[i]]:''};
+    let L=batEv.get(p);if(!L){L=[];batEv.set(p,L)}L.push(ev);
+    const key=ty===1?'b':ty===2?'rec':'tst',set=ty===1?r.nB:ty===2?r.nR:r.nT;set.add(OS[i]);
+    const cur=r[key];
+    if(!cur||a>cur.a||(a===cur.a&&OS[i]>cur.os))r[key]={a,os:OS[i],km:ev.km,prod:ev.prod,forn:ev.forn,val:ev.val,qtd:ev.qtd};
+    else if(OS[i]===cur.os){cur.val+=ev.val;cur.qtd+=ev.qtd;if(ev.km!=null&&(cur.km==null||ev.km>cur.km))cur.km=ev.km;if(!cur.prod.includes(ev.prod))cur.prod+=' + '+ev.prod}
+  }
+  const nm=(f,i)=>{const d=F[f]?F[f][i]:-1;return d<0||!Dt[f]?'':Dt[f][d]};
+  batAll=[...m.values()].map(r=>{const i=r.li,b=r.b,tem=!!b;return {pla:Dt.placa[r.p],tem,st:tem?'Trocou':'Nunca trocou',desde:isFinite(r.first)?r.first:null,
+    data:tem&&b.a>=0?b.a:null,dias:tem&&b.a>=0?today-b.a:null,kmT:tem?b.km:null,kmA:r.km,rod:tem&&b.km!=null&&r.km!=null?r.km-b.km:null,
+    prod:tem?b.prod:'',qtd:tem?b.qtd:null,val:tem?b.val:null,forn:tem?b.forn:'',os:tem?b.os:null,n:r.nB.size,
+    recD:r.rec&&r.rec.a>=0?r.rec.a:null,recKm:r.rec?r.rec.km:null,nRec:r.nR.size,tstD:r.tst&&r.tst.a>=0?r.tst.a:null,tstKm:r.tst?r.tst.km:null,nTst:r.nT.size,
+    modelo:nm('modelo',i),cliente:nm('cliente',i)||'(sem cliente)',marca:nm('marca',i),cls:CLS[i]===2?'Pesado':CLS[i]===1?'Leve':'—'}})
+    .sort((a,b)=>(b.tem-a.tem)||((a.data??0)-(b.data??0))||a.pla.localeCompare(b.pla));
+  filtBat();
+  const dm=v=>v==null?'':cD(v);
+  if(!vtBat)vtBat=VT($('vtBat'),[
+    {h:'Placa',v:r=>r.pla,f:v=>`<span class="warn">${esc(v)}</span>`},
+    {h:'Situação',v:r=>r.st,f:v=>v==='Trocou'?'<span class="tag p">Trocou</span>':'<span class="tag c">Nunca trocou</span>'},
+    {h:'Na base desde',date:1,v:r=>r.desde,f:cD},
+    {h:'Data da última troca',date:1,v:r=>r.data,f:cD},
+    {h:'KM na troca',num:1,v:r=>r.kmT,f:(v,r)=>v!=null?cI(v):(r&&r.tem?'<span style="color:var(--muted)">não informado</span>':'')},
+    {h:'Dias desde a troca',num:1,v:r=>r.dias,f:cI},
+    {h:'Último KM',num:1,v:r=>r.kmA,f:cI},
+    {h:'KM rodado desde a troca',num:1,v:r=>r.rod,f:v=>v==null?'':v<0?`<span class="neg" title="Último KM menor que o KM da troca">${cI(v)}</span>`:cI(v)},
+    {h:'Bateria (produto)',v:r=>r.prod,title:1},{h:'Qtd',num:1,v:r=>r.qtd,f:cN},{h:'Valor',num:1,v:r=>r.val,f:cM},
+    {h:'Fornecedor',v:r=>r.forn,title:1},{h:'OS',num:1,v:r=>r.os,f:v=>v==null?'':String(v)},{h:'Nº de trocas',num:1,v:r=>r.n,f:cI},
+    {h:'Última recarga',date:1,v:r=>r.recD,f:dm},{h:'KM na recarga',num:1,v:r=>r.recKm,f:cI},{h:'Nº de recargas',num:1,v:r=>r.nRec,f:v=>v?cI(v):''},
+    {h:'Último teste',date:1,v:r=>r.tstD,f:dm},{h:'KM no teste',num:1,v:r=>r.tstKm,f:cI},{h:'Nº de testes',num:1,v:r=>r.nTst,f:v=>v?cI(v):''},
+    {h:'Modelo',v:r=>r.modelo,title:1},{h:'Cliente',v:r=>r.cliente,title:1},
+    {h:'Leve/Pesado',v:r=>r.cls,f:v=>v==='Pesado'?'<span class="tag c">Pesado</span>':v==='Leve'?'<span class="tag p">Leve</span>':'—'},{h:'Marca',v:r=>r.marca}
+  ],()=>batRows,{key:'bat-v2',colFilter:1,click:r=>{batSel=r.pla;vtBat.draw();batHist()},sel:r=>r.pla===batSel,onFilter:()=>{cntBat();batHist()}});
+  vtBat.refresh();cntBat();batHist();
+}
+function filtBat(){const t=pfBat.value.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().split(/\s+/).filter(Boolean);
+  batRows=batAll.filter(r=>(batSeg===0||(batSeg===1&&r.tem)||(batSeg===2&&!r.tem)||(batSeg===3&&(r.nRec||r.nTst)))&&(!t.length||t.every(w=>(r.pla+' '+r.modelo+' '+r.cliente+' '+r.marca+' '+r.prod).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().includes(w))))}
+function cntBat(){if(!vtBat)return;const n=vtBat.count(),f=vtBat.cfActive(),c=batAll.filter(r=>r.tem).length,rc=batAll.filter(r=>r.nRec).length,ts=batAll.filter(r=>r.nTst).length;
+  $('cntBat').innerHTML=fmtI.format(n)+' placas na lista · '+fmtI.format(c)+' com troca · <span class="warn">'+fmtI.format(batAll.length-c)+' nunca trocaram</span> · '+fmtI.format(rc)+' com recarga · '+fmtI.format(ts)+' com teste'+(f?' · <span class="warn">'+f+' filtro(s) de coluna</span>':'')}
+function batHist(){
+  const box=$('batHist');if(!vtBat){box.style.display='none';return}
+  const rows=vtBat.rows();let pla=batSel&&rows.some(r=>r.pla===batSel)?batSel:(rows.length===1?rows[0].pla:null);
+  if(!pla){box.style.display='none';return}
+  const r=batAll.find(x=>x.pla===pla),pi=Dt.placa.indexOf(pla),L=(batEv.get(pi)||[]).slice().sort((a,b)=>(b.a-a.a)||(b.os-a.os));
+  const tag=t=>t===1?'<span class="tag p">Troca</span>':t===2?'<span class="tag r">Recarga</span>':'<span class="tag t">Teste</span>';
+  const head=`<h3>Histórico de bateria · <span class="warn">${esc(pla)}</span> <span style="color:var(--muted);font-weight:400;font-size:12px">${esc(r.modelo)} · ${esc(r.cliente)} · último KM ${r.kmA!=null?cI(r.kmA):'—'}</span></h3>`;
+  const resumo=r.tem?`<div class="note" style="margin-bottom:8px">Última troca em <b>${cD(r.data)}</b>${r.kmT!=null?' com <b>'+cI(r.kmT)+' km</b>':''} · há ${cI(r.dias)} dias${r.rod!=null?' · '+cI(r.rod)+' km rodados desde então':''} · ${r.n} troca(s) no total.</div>`
+    :`<div class="note" style="margin-bottom:8px"><span class="tag c">Nunca trocou</span> Nenhuma troca de bateria registrada desde ${r.desde!=null?'<b>'+cD(r.desde)+'</b> (primeira OS da placa na base)':'a primeira OS da placa'}.${r.desde!=null?' São '+cI(today-r.desde)+' dias.':''}</div>`;
+  const tb=L.length?`<table><thead><tr><th>Tipo</th><th>Data</th><th class="num">KM</th><th>Produto</th><th class="num">Qtd</th><th class="num">Valor</th><th>Fornecedor</th><th class="num">OS</th></tr></thead><tbody>${L.map(e=>`<tr><td>${tag(e.ty)}</td><td>${cD(e.a)}</td><td class="num">${e.km!=null?cI(e.km):''}</td><td>${esc(e.prod)}</td><td class="num">${cN(e.qtd)}</td><td class="num">${cM(e.val)}</td><td>${esc(e.forn)}</td><td class="num">${e.os}</td></tr>`).join('')}</tbody></table>`:'<div class="note">Nenhuma troca, recarga ou teste de bateria registrado para esta placa.</div>';
+  box.innerHTML=head+resumo+tb+`<div style="margin-top:8px"><button class="btn" id="batGoItens">Ver todos os itens desta placa</button></div>`;box.style.display='';
+  $('batGoItens').onclick=()=>{q.value=pla;applyFilters();go('itens')};
+}
+let tB;pfBat.oninput=()=>{clearTimeout(tB);tB=setTimeout(()=>{batSel=null;filtBat();if(vtBat){vtBat.refresh();cntBat();batHist()}},200)};
+document.querySelectorAll('#batSeg button').forEach(b=>b.onclick=()=>{batSeg=+b.dataset.s;document.querySelectorAll('#batSeg button').forEach(x=>x.classList.toggle('on',x===b));filtBat();if(vtBat){vtBat.refresh();cntBat();batHist()}});
+$('csvBat').onclick=()=>{if(!vtBat)return;const C=vtBat.cols();const lines=[C.map(c=>c.h).join(';')];
+  for(const r of vtBat.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v).replace('.',',');v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='baterias.csv';a.click()};
+
 // ---- clientes por carro (cliente × placa)
 let vtCC=null,ccRows=[];
 function renderCliCar(){
@@ -1069,7 +1165,7 @@ function dqCards(){
 }
 
 // ================= navegação =================
-const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,obs:()=>updBadge()};
+const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
 function go(t){curTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
@@ -1110,7 +1206,7 @@ self.onmessage=function(e){
 };`;
 function sheetSrc(){return new TextDecoder().decode(Uint8Array.from(atob($('sheetjs').textContent.trim()),c=>c.charCodeAt(0)))}
 function blobURL(txt,type){return URL.createObjectURL(new Blob([txt],{type:type||'text/javascript'}))}
-const ADM={salt:'77de351136770ababad0f29d7e39403b',hash:'037ceefa7ca3f9b37d6c17c6b3ee347b5445205447547215b1c7c1335eac3c1e'};let admOk=false;
+const ADM={salt:'5e1d0815e0dbccb9db75f43ea6704b1a',hash:'b80439e3c76ed83bbee06c4a1e16a724456ec140c84415af20889fc408787bd0'};let admOk=false;
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 try{admOk=sessionStorage.getItem('loc-adm')===ADM.hash}catch(e){}
 function admClose(){$('adm').classList.remove('on');$('admPw').value='';$('admErr').textContent=''}
