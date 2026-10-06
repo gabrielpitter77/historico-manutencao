@@ -213,6 +213,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   </div>
   <div class="tabs" id="tabs">
     <div class="tab on" data-v="itens">Itens de OS</div>
+    <div class="tab" data-v="km">Consulta de KM</div>
     <div class="tab" data-v="alertas">Alertas e qualidade</div>
     <div class="tab" data-v="modelo">Custo por modelo</div>
     <div class="tab" data-v="mensal">Evolução mensal</div>
@@ -283,6 +284,11 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="vt" id="vtCli"></div>
   </section>
 
+  <section class="view" id="v-km">
+    <div class="tbar"><input class="pf" id="pfKm" placeholder="Pesquisar placa, modelo, cliente ou marca…" style="width:340px"><span id="cntKm"></span><span class="note">Uma linha por placa. Último KM = maior leitura válida da OS mais recente que informou KM. Cliente, modelo e marca são os da OS mais recente. Clique numa linha para ver os itens da placa.</span><div class="sp"><button class="btn amber" id="csvKm">Exportar CSV</button></div></div>
+    <div class="vt" id="vtKm"></div>
+  </section>
+
   <section class="view" id="v-clicar">
     <div class="tbar"><span id="cntCC"></span><span class="note">Uma linha por cliente × placa. “Atual” = cliente da OS mais recente daquela placa. Clique numa linha para ver os itens. Use a setinha ▾ de cada título para filtrar (seleção múltipla).</span><div class="sp"><button class="btn amber" id="csvCC">Exportar CSV</button></div></div>
     <div class="vt" id="vtCC"></div>
@@ -305,6 +311,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
         <li><b>Recolher filtros</b> e <b>Recolher indicadores</b> liberam espaço na tela.</li>
         <li>Clicar numa barra/linha de modelo, grupo ou cliente adiciona aquele item ao filtro.</li>
         <li><b>Geral / Leves / Pesados</b> (aba Itens de OS): vale para o painel inteiro. Pesados = grupos Caminhão, Máquina e Implemento; o resto é Leve. O grupo vem do modelo do veículo; modelos novos sem cadastro são classificados pelo nome (ex.: Atego, Axor, VM, Delivery, “6x4”).</li>
+        <li><b>Consulta de KM:</b> uma linha por placa com o último KM informado nas OS (e a data dessa leitura), modelo, cliente atual, Leve/Pesado e marca. Coluna <b>Maior KM</b>: a maior leitura já informada para a placa; fica âmbar com ⚠ quando o último KM é menor (hodômetro trocado ou KM digitado errado). Respeita os filtros do topo. KM abaixo de 10 (ex.: “1”, valor de preenchimento) ou acima de 2.000.000 é ignorado.</li>
         <li><b>Clientes por carro:</b> uma linha por cliente × placa. “Atual = Sim” marca o cliente da OS mais recente da placa (o carro pode ter passado por vários clientes).</li>
       </ul></div>
       <div class="bracket card"><h3>Cuidados com os números</h3><ul class="obs">
@@ -516,7 +523,7 @@ let S=null,N=0,F={},Dt={},has={};
 let YEAR,MK,LOW={},CORR=-1,isCorr;
 let idx=new Uint32Array(0),idxI=new Uint32Array(0);
 const dirty={};let curTab='itens';
-const TABS=['itens','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
+const TABS=['itens','km','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
 const val=(k,i)=>{const f=S.fields[k];if(!f)return null;const v=f.data[i];if(f.dict)return v<0?null:f.dict[v];if(f.type==='d')return v<0?null:v;if(f.type==='i')return v<0?null:v;return isNaN(v)?null:v};
 const num=(k,i)=>{const v=F[k]?F[k][i]:NaN;return isNaN(v)?0:v};
 
@@ -529,7 +536,7 @@ function setStore(st){
   CORR=has.tipo?Dt.tipo.findIndex(v=>/corret/i.test(v)):-1;
   buildCls();
   isCorr=i=>has.tipo&&F.tipo[i]===CORR;
-  vtMod=vtMes=vtG=vtP=vtPF=vtPl=vtFo=vtCl=vtR=vtL=vtCC=null;selProd=-1;
+  vtMod=vtMes=vtG=vtP=vtPF=vtPl=vtFo=vtCl=vtR=vtL=vtCC=vtKm=null;selProd=-1;
   buildFilters();buildItemsTable();
   $('dlPlaca').innerHTML=Dt.placa?[...Dt.placa].filter(Boolean).sort().map(v=>`<option value="${esc(v)}">`).join(''):'';
   $('dlProd').innerHTML=has.produto?[...Dt.produto].filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(v=>`<option value="${esc(v)}">`).join(''):'';
@@ -966,6 +973,39 @@ function renderCli(){
 }
 
 
+// ---- consulta de KM (uma linha por placa)
+let vtKm=null,kmRows=[],kmAll=[];const pfKm=$('pfKm');
+function renderKm(){
+  const A=F.abert,K=F.km,PL=F.placa,m=new Map();
+  for(const i of idx){
+    const p=PL[i],a=A[i];let r=m.get(p);if(!r){r={p,last:-1,li:-1,km:null,kmD:-1,kmOs:null,mx:null};m.set(p,r)}
+    if(a>r.last||(a===r.last&&(F.os[i]>F.os[r.li]))){r.last=a;r.li=i}
+    const k=K?K[i]:NaN;if(isFinite(k)&&k>=10&&k<2e6){if(r.mx==null||k>r.mx)r.mx=k;if(a>r.kmD||(a===r.kmD&&k>r.km)){r.km=k;r.kmD=a;r.kmOs=F.os[i]}}
+  }
+  const name=(f,i)=>{const d=F[f]?F[f][i]:-1;return d<0||!Dt[f]?'':Dt[f][d]};
+  kmAll=[...m.values()].map(r=>{const i=r.li;return {pla:Dt.placa[r.p],km:r.km,mx:r.mx,kmD:r.kmD<0?null:r.kmD,kmOs:r.kmOs,modelo:name('modelo',i),cliente:name('cliente',i)||'(sem cliente)',marca:name('marca',i),cls:CLS[i]===2?'Pesado':CLS[i]===1?'Leve':'—'}})
+    .sort((a,b)=>a.pla.localeCompare(b.pla));
+  filtKm();
+  if(!vtKm)vtKm=VT($('vtKm'),[
+    {h:'Placa',v:r=>r.pla,f:v=>`<span class="warn">${esc(v)}</span>`},
+    {h:'Último KM',num:1,v:r=>r.km,f:v=>v==null?'<span style="color:var(--muted)">não informado</span>':cI(v)},
+    {h:'Maior KM',num:1,v:r=>r.mx,f:(v,r)=>v==null?'':(r&&r.km!=null&&r.km<v?`<span class="warn" title="Último KM menor que o maior já informado: hodômetro trocado ou KM digitado errado">${cI(v)} ⚠</span>`:cI(v))},
+    {h:'Data do KM',date:1,v:r=>r.kmD,f:cD},
+    {h:'Modelo',v:r=>r.modelo,title:1},{h:'Cliente',v:r=>r.cliente,title:1},
+    {h:'Leve/Pesado',v:r=>r.cls,f:v=>v==='Pesado'?'<span class="tag c">Pesado</span>':v==='Leve'?'<span class="tag p">Leve</span>':'—'},
+    {h:'Marca',v:r=>r.marca}
+  ],()=>kmRows,{key:'km-v1',colFilter:1,click:r=>{q.value=r.pla;applyFilters();go('itens')},onFilter:()=>cntKm()});
+  vtKm.refresh();cntKm();
+}
+function filtKm(){const t=pfKm.value.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().split(/\s+/).filter(Boolean);
+  kmRows=t.length?kmAll.filter(r=>{const s=(r.pla+' '+r.modelo+' '+r.cliente+' '+r.marca).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();return t.every(w=>s.includes(w))}):kmAll}
+function cntKm(){if(!vtKm)return;const n=vtKm.count(),f=vtKm.cfActive(),sem=kmAll.filter(r=>r.km==null).length;
+  $('cntKm').innerHTML=fmtI.format(n)+' placas'+(n!==kmAll.length?' (de '+fmtI.format(kmAll.length)+')':'')+(sem?' · '+fmtI.format(sem)+' sem KM informado':'')+(f?' · <span class="warn">'+f+' filtro(s) de coluna</span>':'')}
+let tK;pfKm.oninput=()=>{clearTimeout(tK);tK=setTimeout(()=>{filtKm();if(vtKm){vtKm.refresh();cntKm()}},200)};
+$('csvKm').onclick=()=>{if(!vtKm)return;const C=vtKm.cols();const lines=[C.map(c=>c.h).join(';')];
+  for(const r of vtKm.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v);v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='consulta_km.csv';a.click()};
+
 // ---- clientes por carro (cliente × placa)
 let vtCC=null,ccRows=[];
 function renderCliCar(){
@@ -1029,7 +1069,7 @@ function dqCards(){
 }
 
 // ================= navegação =================
-const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,obs:()=>updBadge()};
+const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
 function go(t){curTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
@@ -1070,7 +1110,7 @@ self.onmessage=function(e){
 };`;
 function sheetSrc(){return new TextDecoder().decode(Uint8Array.from(atob($('sheetjs').textContent.trim()),c=>c.charCodeAt(0)))}
 function blobURL(txt,type){return URL.createObjectURL(new Blob([txt],{type:type||'text/javascript'}))}
-const ADM={salt:'b0be8f77ab21623697d5983004d31b0d',hash:'7c27ed3badbbd747c044cfc677ad06a7ce6611af9136ac3c429af5a411f8eca3'};let admOk=false;
+const ADM={salt:'77de351136770ababad0f29d7e39403b',hash:'037ceefa7ca3f9b37d6c17c6b3ee347b5445205447547215b1c7c1335eac3c1e'};let admOk=false;
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 try{admOk=sessionStorage.getItem('loc-adm')===ADM.hash}catch(e){}
 function admClose(){$('adm').classList.remove('on');$('admPw').value='';$('admErr').textContent=''}
