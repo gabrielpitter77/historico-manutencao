@@ -307,7 +307,6 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
 
   <section class="view" id="v-bat">
     <div class="tbar"><input class="pf" id="pfBat" placeholder="Pesquisar placa, modelo, cliente ou bateria…" style="width:300px"><div class="seg" id="batSeg"><button type="button" data-s="0" class="on">Todas</button><button type="button" data-s="1">Com troca</button><button type="button" data-s="2">Nunca trocou</button><button type="button" data-s="3">Com recarga/teste</button></div><span id="cntBat"></span><div class="sp"><button class="btn amber" id="csvBat">Exportar CSV</button></div></div>
-    <div class="batinfo"><b>Nunca trocou</b> = nenhuma troca de bateria nas OS da base desde a primeira OS da placa (coluna “Na base desde”). Pode ser a bateria original ou troca feita fora do sistema. <b>Troca</b> = produto que começa com “BATERIA” (sem carga, cabo, terminal, suporte, tampa, bateria de chave/controle, joystick, carregador, solução, fusível). <b>Recarga</b> = carga/recarga/carga lenta de bateria. <b>Teste</b> = teste/diagnóstico de bateria ou do sistema de carga e partida. Pesquise ou clique numa placa para ver o histórico completo.</div>
     <div id="batHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
     <div class="vt" id="vtBat"></div>
   </section>
@@ -1217,7 +1216,7 @@ self.onmessage=function(e){
 };`;
 function sheetSrc(){return new TextDecoder().decode(Uint8Array.from(atob($('sheetjs').textContent.trim()),c=>c.charCodeAt(0)))}
 function blobURL(txt,type){return URL.createObjectURL(new Blob([txt],{type:type||'text/javascript'}))}
-const ADM={salt:'3f4ff16c29441f1ce563d1ee729cf51b',hash:'b6d755ed71dd6e44df4fb4931c97c4fef888c02fdadd4fda9b47a3026c683d2e'};let admOk=false;
+const ADM={salt:'c818cab1548879d068ec92c846230c3f',hash:'05f510e77c571adbe33710b6b349dde5dd925b7e3c7dbd66144a8e34e751d1e5'};let admOk=false;
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 try{admOk=sessionStorage.getItem('loc-adm')===ADM.hash}catch(e){}
 function admClose(){$('adm').classList.remove('on');$('admPw').value='';$('admErr').textContent=''}
