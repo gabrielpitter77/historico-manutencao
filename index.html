@@ -59,6 +59,13 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .tabsw{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
 .tabs{display:flex;gap:2px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth;margin-bottom:-1px}
 .tabs::-webkit-scrollbar{display:none}
+*{scrollbar-width:thin;scrollbar-color:#2E3B57 transparent}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#2E3B57;border-radius:8px}
+*::-webkit-scrollbar-thumb:hover{background:#F5A623}
+*::-webkit-scrollbar-corner{background:transparent}
+:root{color-scheme:dark}
 .tabarr{flex:none;width:34px;background:var(--panel2);border:1px solid var(--line);border-bottom:none;color:var(--amber);font-size:20px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0}
 .tabarr:hover{background:var(--navy);color:#fff}
 .tabarr.on{display:flex}
