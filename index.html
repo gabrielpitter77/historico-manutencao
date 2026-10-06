@@ -316,7 +316,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   </section>
 
   <section class="view" id="v-bat">
-    <div class="tbar"><input class="pf" id="pfBat" placeholder="Pesquisar placa, modelo, cliente ou bateria…" style="width:300px"><div class="seg" id="batSeg"><button type="button" data-s="0" class="on">Todas</button><button type="button" data-s="1">Com troca</button><button type="button" data-s="2">Nunca trocou</button><button type="button" data-s="3">Com recarga/teste</button></div><span id="cntBat"></span><div class="sp"><button class="btn amber" id="csvBat">Exportar CSV</button></div></div>
+    <div class="tbar"><input class="pf" id="pfBat" placeholder="Pesquisar placa, modelo, cliente ou bateria…" style="width:300px"><div class="seg" id="batSeg"><button type="button" data-s="0" class="on">Todas</button><button type="button" data-s="1">Com troca</button><button type="button" data-s="2">Nunca trocou</button><button type="button" data-s="3">Com recarga/teste</button></div><div class="seg" id="batSeg2"><button type="button" data-s="0" class="on">Custo: todos</button><button type="button" data-s="1">Cliente hoje</button><button type="button" data-s="2">LOC hoje</button><button type="button" data-s="3">Troca &lt; 18m sem reembolso</button></div><div class="seg" id="batSeg3"><button type="button" data-s="0" class="on">Geral</button><button type="button" data-s="1">Leves</button><button type="button" data-s="2">Pesados</button></div><span id="cntBat"></span><div class="sp"><button class="btn amber" id="csvBat">Exportar CSV</button></div></div>
     <div id="batHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
     <div class="vt" id="vtBat"></div>
   </section>
@@ -1041,6 +1041,8 @@ $('csvKm').onclick=()=>{if(!vtKm)return;const C=vtKm.cols();const lines=[C.map(c
 
 // ---- baterias (última troca, recarga e teste por placa)
 const BAT_EXC=/carga|regarga|cabo|terminal|polo|suporte|tampa|chave|controle|alarme|joy ?stick|carregador|remoc|marcac|teste|protetor|ponteira|sensor|chupeta|auxilio|partida|diagnost|limpeza|instala|fixac|parafuso|abracadeira|presilha|borne|relogio|trava|isolador|chicote|rele|fu[sz]ivel|pilha|celular|radio|lanterna|rastreador|tablet|notebook|cinta|bandeja|desligamento|mao de obra|servico|solucao|conector|agua|solenoide/;
+const add18=d=>{const x=new Date(d*864e5);const dd=x.getUTCDate();x.setUTCDate(1);x.setUTCMonth(x.getUTCMonth()+18);const lm=new Date(Date.UTC(x.getUTCFullYear(),x.getUTCMonth()+1,0)).getUTCDate();x.setUTCDate(Math.min(dd,lm));return Math.floor(x/864e5)};
+let batSeg2=0,batSeg3=0;
 let vtBat=null,batRows=[],batAll=[],batSeg=0,BATP=null,batSel=null,batEv=new Map();const pfBat=$('pfBat');
 // 1 = troca, 2 = recarga, 3 = teste
 function batMask(){if(BATP&&BATP.n===Dt.produto.length)return BATP.m;const m=new Uint8Array(Dt.produto.length);
@@ -1059,7 +1061,7 @@ function renderBat(){
     if(a>=0&&a<r.first)r.first=a;
     const k=K?K[i]:NaN;if(okK(k)&&(a>r.kmD||(a===r.kmD&&k>r.km))){r.km=k;r.kmD=a}
     const pd=PR[i];if(pd<0)continue;const ty=BM[pd];if(!ty)continue;
-    const ev={ty,a,os:OS[i],km:okK(k)?k:null,prod:Dt.produto[pd],val:T[i]||0,qtd:Q?(Q[i]||0):0,forn:F.forn&&F.forn[i]>=0?Dt.forn[F.forn[i]]:''};
+    const ev={ty,a,os:OS[i],km:okK(k)?k:null,prod:Dt.produto[pd],val:T[i]||0,re:(F.reemb&&F.reemb[i])||0,qtd:Q?(Q[i]||0):0,forn:F.forn&&F.forn[i]>=0?Dt.forn[F.forn[i]]:''};
     let L=batEv.get(p);if(!L){L=[];batEv.set(p,L)}L.push(ev);
     const key=ty===1?'b':ty===2?'rec':'tst',set=ty===1?r.nB:ty===2?r.nR:r.nT;set.add(OS[i]);
     const cur=r[key];
@@ -1067,7 +1069,10 @@ function renderBat(){
     else if(OS[i]===cur.os){cur.val+=ev.val;cur.qtd+=ev.qtd;if(ev.km!=null&&(cur.km==null||ev.km>cur.km))cur.km=ev.km;if(!cur.prod.includes(ev.prod))cur.prod+=' + '+ev.prod}
   }
   const nm=(f,i)=>{const d=F[f]?F[f][i]:-1;return d<0||!Dt[f]?'':Dt[f][d]};
-  batAll=[...m.values()].map(r=>{const i=r.li,b=r.b,tem=!!b;return {pla:Dt.placa[r.p],tem,st:tem?'Trocou':'Nunca trocou',desde:isFinite(r.first)?r.first:null,
+  // regra dos 18 meses: troca antes de 18 meses da anterior = custo do cliente
+  const aud=p=>{const L=batEv.get(p)||[],o=new Map();for(const e of L){if(e.ty!==1||e.a<0)continue;let x=o.get(e.os);if(!x){x={a:e.a,v:0,re:0};o.set(e.os,x)}x.a=Math.min(x.a,e.a);x.v+=e.val;x.re+=e.re}
+    const ev=[...o.values()].sort((a,b)=>a.a-b.a);let c=0,sr=0,sv=0;for(let k=1;k<ev.length;k++){if(ev[k].a<add18(ev[k-1].a)){c++;if(!(ev[k].re>0)){sr++;sv+=ev[k].v}}}return {c,sr,sv}};
+  batAll=[...m.values()].map(r=>{const i=r.li,b=r.b,tem=!!b,au=aud(r.p),ref=tem&&b.a>=0?b.a:(isFinite(r.first)?r.first:null),vl=ref!=null?add18(ref):null;return {cus:vl==null?'':today<vl?'Cliente':'LOC',vl,refB:!tem,a18:au.c,a18s:au.sr,a18v:au.sv,pla:Dt.placa[r.p],tem,st:tem?'Trocou':'Nunca trocou',desde:isFinite(r.first)?r.first:null,
     data:tem&&b.a>=0?b.a:null,dias:tem&&b.a>=0?today-b.a:null,kmT:tem?b.km:null,kmA:r.km,rod:tem&&b.km!=null&&r.km!=null?r.km-b.km:null,
     prod:tem?b.prod:'',qtd:tem?b.qtd:null,val:tem?b.val:null,forn:tem?b.forn:'',os:tem?b.os:null,n:r.nB.size,
     recD:r.rec&&r.rec.a>=0?r.rec.a:null,recKm:r.rec?r.rec.km:null,nRec:r.nR.size,tstD:r.tst&&r.tst.a>=0?r.tst.a:null,tstKm:r.tst?r.tst.km:null,nTst:r.nT.size,
@@ -1082,6 +1087,11 @@ function renderBat(){
     {h:'Data da última troca',date:1,v:r=>r.data,f:cD},
     {h:'KM na troca',num:1,v:r=>r.kmT,f:(v,r)=>v!=null?cI(v):(r&&r.tem?'<span style="color:var(--muted)">não informado</span>':'')},
     {h:'Dias desde a troca',num:1,v:r=>r.dias,f:cI},
+    {h:'Custo hoje',v:r=>r.cus,f:(v,r)=>v==='Cliente'?'<span class="tag t"'+(r&&r.refB?' title="Sem troca: conta da 1ª OS na base"':'')+'>Cliente</span>':v==='LOC'?'<span class="tag r"'+(r&&r.refB?' title="Sem troca: conta da 1ª OS na base"':'')+'>LOC</span>':''},
+    {h:'Vira LOC em',date:1,v:r=>r.vl,f:(v,r)=>v==null?'':(v>today?cD(v):'<span style="color:var(--muted)">'+cD(v)+'</span>')},
+    {h:'Trocas < 18m',num:1,v:r=>r.a18,f:v=>v?cI(v):''},
+    {h:'< 18m sem reembolso',num:1,v:r=>r.a18s,f:v=>v?'<span class="neg">'+cI(v)+'</span>':''},
+    {h:'Valor < 18m sem reemb.',num:1,v:r=>r.a18v,f:v=>v?'<span class="neg">'+cM(v)+'</span>':''},
     {h:'Último KM',num:1,v:r=>r.kmA,f:cI},
     {h:'KM rodado desde a troca',num:1,v:r=>r.rod,f:v=>v==null?'':v<0?`<span class="neg" title="Último KM menor que o KM da troca">${cI(v)}</span>`:cI(v)},
     {h:'Bateria (produto)',v:r=>r.prod,title:1},{h:'Qtd',num:1,v:r=>r.qtd,f:cN},{h:'Valor',num:1,v:r=>r.val,f:cM},
@@ -1090,27 +1100,31 @@ function renderBat(){
     {h:'Último teste',date:1,v:r=>r.tstD,f:dm},{h:'KM no teste',num:1,v:r=>r.tstKm,f:cI},{h:'Nº de testes',num:1,v:r=>r.nTst,f:v=>v?cI(v):''},
     {h:'Modelo',v:r=>r.modelo,title:1},{h:'Cliente',v:r=>r.cliente,title:1},
     {h:'Leve/Pesado',v:r=>r.cls,f:v=>v==='Pesado'?'<span class="tag c">Pesado</span>':v==='Leve'?'<span class="tag p">Leve</span>':'—'},{h:'Marca',v:r=>r.marca}
-  ],()=>batRows,{key:'bat-v2',colFilter:1,click:r=>{batSel=r.pla;vtBat.draw();batHist()},sel:r=>r.pla===batSel,onFilter:()=>{cntBat();batHist()}});
+  ],()=>batRows,{key:'bat-v3',colFilter:1,click:r=>{batSel=r.pla;vtBat.draw();batHist()},sel:r=>r.pla===batSel,onFilter:()=>{cntBat();batHist()}});
   vtBat.refresh();cntBat();batHist();
 }
 function filtBat(){const t=pfBat.value.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().split(/\s+/).filter(Boolean);
-  batRows=batAll.filter(r=>(batSeg===0||(batSeg===1&&r.tem)||(batSeg===2&&!r.tem)||(batSeg===3&&(r.nRec||r.nTst)))&&(!t.length||t.every(w=>(r.pla+' '+r.modelo+' '+r.cliente+' '+r.marca+' '+r.prod).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().includes(w))))}
+  batRows=batAll.filter(r=>(batSeg2===0||(batSeg2===1&&r.cus==='Cliente')||(batSeg2===2&&r.cus==='LOC')||(batSeg2===3&&r.a18s>0))&&(batSeg3===0||(batSeg3===1&&r.cls==='Leve')||(batSeg3===2&&r.cls==='Pesado'))&&(batSeg===0||(batSeg===1&&r.tem)||(batSeg===2&&!r.tem)||(batSeg===3&&(r.nRec||r.nTst)))&&(!t.length||t.every(w=>(r.pla+' '+r.modelo+' '+r.cliente+' '+r.marca+' '+r.prod).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().includes(w))))}
 function cntBat(){if(!vtBat)return;const n=vtBat.count(),f=vtBat.cfActive(),c=batAll.filter(r=>r.tem).length,rc=batAll.filter(r=>r.nRec).length,ts=batAll.filter(r=>r.nTst).length;
-  $('cntBat').innerHTML=fmtI.format(n)+' placas na lista · '+fmtI.format(c)+' com troca · <span class="warn">'+fmtI.format(batAll.length-c)+' nunca trocaram</span> · '+fmtI.format(rc)+' com recarga · '+fmtI.format(ts)+' com teste'+(f?' · <span class="warn">'+f+' filtro(s) de coluna</span>':'')}
+  $('cntBat').innerHTML=fmtI.format(n)+' placas na lista · '+fmtI.format(c)+' com troca · <span class="warn">'+fmtI.format(batAll.length-c)+' nunca trocaram</span> · '+fmtI.format(rc)+' com recarga · '+fmtI.format(ts)+' com teste'+(()=>{const L=vtBat.rows();let cl=0,lc=0,a=0,v=0;for(const r of L){if(r.cus==='Cliente')cl++;else if(r.cus==='LOC')lc++;if(r.a18s){a+=r.a18s;v+=r.a18v}}return '<br>Na lista: <span class="tag t">Cliente hoje</span> '+fmtI.format(cl)+' · <span class="tag r">LOC hoje</span> '+fmtI.format(lc)+' · trocas &lt; 18m sem reembolso: <span class="neg">'+fmtI.format(a)+' ('+cM(v)+')</span>'})()+(f?' · <span class="warn">'+f+' filtro(s) de coluna</span>':'')}
 function batHist(){
   const box=$('batHist');if(!vtBat){box.style.display='none';return}
   const rows=vtBat.rows();let pla=batSel&&rows.some(r=>r.pla===batSel)?batSel:(rows.length===1?rows[0].pla:null);
   if(!pla){box.style.display='none';return}
   const r=batAll.find(x=>x.pla===pla),pi=Dt.placa.indexOf(pla),L=(batEv.get(pi)||[]).slice().sort((a,b)=>(b.a-a.a)||(b.os-a.os));
+  const os18=new Map();{const o=new Map();for(const e of L){if(e.ty!==1||e.a<0)continue;let x=o.get(e.os);if(!x){x={os:e.os,a:e.a,re:0};o.set(e.os,x)}x.a=Math.min(x.a,e.a);x.re+=e.re}
+    const ev=[...o.values()].sort((a,b)=>a.a-b.a);ev.forEach((x,k)=>{if(!k){os18.set(x.os,'<span style="color:var(--muted)">1ª troca na base</span>');return}const lim=add18(ev[k-1].a);
+      os18.set(x.os,x.a<lim?'<span class="tag t">Cliente</span> '+cI(x.a-ev[k-1].a)+' dias após a anterior · '+(x.re>0?'<span style="color:var(--green)">reembolso '+cM(x.re)+'</span>':'<span class="neg">sem reembolso</span>'):'<span class="tag r">LOC</span> '+cI(x.a-ev[k-1].a)+' dias após a anterior')})}
   const tag=t=>t===1?'<span class="tag p">Troca</span>':t===2?'<span class="tag r">Recarga</span>':'<span class="tag t">Teste</span>';
   const head=`<h3>Histórico de bateria · <span class="warn">${esc(pla)}</span> <span style="color:var(--muted);font-weight:400;font-size:12px">${esc(r.modelo)} · ${esc(r.cliente)} · último KM ${r.kmA!=null?cI(r.kmA):'—'}</span></h3>`;
-  const resumo=r.tem?`<div class="note" style="margin-bottom:8px">Última troca em <b>${cD(r.data)}</b>${r.kmT!=null?' com <b>'+cI(r.kmT)+' km</b>':''} · há ${cI(r.dias)} dias${r.rod!=null?' · '+cI(r.rod)+' km rodados desde então':''} · ${r.n} troca(s) no total.</div>`
-    :`<div class="note" style="margin-bottom:8px"><span class="tag c">Nunca trocou</span> Nenhuma troca de bateria registrada desde ${r.desde!=null?'<b>'+cD(r.desde)+'</b> (primeira OS da placa na base)':'a primeira OS da placa'}.${r.desde!=null?' São '+cI(today-r.desde)+' dias.':''}</div>`;
-  const tb=L.length?`<table><thead><tr><th>Tipo</th><th>Data</th><th class="num">KM</th><th>Produto</th><th class="num">Qtd</th><th class="num">Valor</th><th>Fornecedor</th><th class="num">OS</th></tr></thead><tbody>${L.map(e=>`<tr><td>${tag(e.ty)}</td><td>${cD(e.a)}</td><td class="num">${e.km!=null?cI(e.km):''}</td><td>${esc(e.prod)}</td><td class="num">${cN(e.qtd)}</td><td class="num">${cM(e.val)}</td><td>${esc(e.forn)}</td><td class="num">${e.os}</td></tr>`).join('')}</tbody></table>`:'<div class="note">Nenhuma troca, recarga ou teste de bateria registrado para esta placa.</div>';
+  const resumo=r.tem?`<div class="note" style="margin-bottom:8px">Última troca em <b>${cD(r.data)}</b>${r.kmT!=null?' com <b>'+cI(r.kmT)+' km</b>':''} · há ${cI(r.dias)} dias${r.rod!=null?' · '+cI(r.rod)+' km rodados desde então':''} · ${r.n} troca(s) no total. Custo hoje: ${r.cus==='Cliente'?'<span class="tag t">Cliente</span> até <b>'+cD(r.vl)+'</b>':'<span class="tag r">LOC</span> desde <b>'+cD(r.vl)+'</b>'}.</div>`
+    :`<div class="note" style="margin-bottom:8px"><span class="tag c">Nunca trocou</span> Nenhuma troca de bateria registrada desde ${r.desde!=null?'<b>'+cD(r.desde)+'</b> (primeira OS da placa na base)':'a primeira OS da placa'}.${r.desde!=null?' São '+cI(today-r.desde)+' dias.':''}${r.vl!=null?' Custo hoje (contando da 1ª OS): '+(r.cus==='Cliente'?'<span class="tag t">Cliente</span> até <b>'+cD(r.vl)+'</b>':'<span class="tag r">LOC</span> desde <b>'+cD(r.vl)+'</b>')+'.':''}</div>`;
+  const tb=L.length?`<table><thead><tr><th>Tipo</th><th>Data</th><th class="num">KM</th><th>Produto</th><th class="num">Qtd</th><th class="num">Valor</th><th>Fornecedor</th><th class="num">OS</th><th>Regra 18 meses</th></tr></thead><tbody>${L.map(e=>`<tr><td>${tag(e.ty)}</td><td>${cD(e.a)}</td><td class="num">${e.km!=null?cI(e.km):''}</td><td>${esc(e.prod)}</td><td class="num">${cN(e.qtd)}</td><td class="num">${cM(e.val)}</td><td>${esc(e.forn)}</td><td class="num">${e.os}</td><td>${e.ty===1?(os18.get(e.os)||''):''}</td></tr>`).join('')}</tbody></table>`:'<div class="note">Nenhuma troca, recarga ou teste de bateria registrado para esta placa.</div>';
   box.innerHTML=head+resumo+tb+`<div style="margin-top:8px"><button class="btn" id="batGoItens">Ver todos os itens desta placa</button></div>`;box.style.display='';
   $('batGoItens').onclick=()=>{q.value=pla;applyFilters();go('itens')};
 }
 let tB;pfBat.oninput=()=>{clearTimeout(tB);tB=setTimeout(()=>{batSel=null;filtBat();if(vtBat){vtBat.refresh();cntBat();batHist()}},200)};
+['batSeg2','batSeg3'].forEach(id=>document.querySelectorAll('#'+id+' button').forEach(b=>b.onclick=()=>{if(id==='batSeg2')batSeg2=+b.dataset.s;else batSeg3=+b.dataset.s;document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.toggle('on',x===b));filtBat();if(vtBat){vtBat.refresh();cntBat();batHist()}}));
 document.querySelectorAll('#batSeg button').forEach(b=>b.onclick=()=>{batSeg=+b.dataset.s;document.querySelectorAll('#batSeg button').forEach(x=>x.classList.toggle('on',x===b));filtBat();if(vtBat){vtBat.refresh();cntBat();batHist()}});
 $('csvBat').onclick=()=>{if(!vtBat)return;const C=vtBat.cols();const lines=[C.map(c=>c.h).join(';')];
   for(const r of vtBat.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v).replace('.',',');v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
