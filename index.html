@@ -128,6 +128,9 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 #login label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 #login input{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 10px;font-family:var(--mono);font-size:14px;border-radius:2px;text-transform:none;letter-spacing:0}
 #login input:focus{outline:1px solid var(--amber)}
+#login label.lgRem{flex-direction:row;align-items:center;gap:8px;cursor:pointer;font-size:11px}
+#login label.lgRem input{width:15px;height:15px;padding:0;margin:0;accent-color:var(--amber)}
+#login.chk{visibility:hidden}
 #login .btn{height:38px;font-size:13px}
 #lgErr{color:var(--red);font-family:var(--mono);font-size:12px;min-height:16px}
 #localBadge{display:none;background:rgba(245,166,35,.15);border:1px solid var(--amber);color:var(--amber);font-family:var(--mono);font-size:12px;padding:8px 24px}
@@ -206,7 +209,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
 </style>
 </head>
 <body>
-<div id="login"><form id="lgForm" class="bracket" autocomplete="on"><div class="brand">LOC <b>FROTAS</b></div><div class="lt">Histórico de Manutenção</div><label>Usuário<input id="lgU" autocomplete="username" spellcheck="false"></label><label>Senha<input id="lgP" type="password" autocomplete="current-password"></label><button class="btn amber" id="lgBtn" type="submit">Entrar</button><div id="lgErr"></div><div class="note">Os dados deste arquivo são criptografados e só abrem com o usuário e a senha corretos.</div></form></div>
+<div id="login" class="chk"><form id="lgForm" class="bracket" autocomplete="on"><div class="brand">LOC <b>FROTAS</b></div><div class="lt">Histórico de Manutenção</div><label>Usuário<input id="lgU" autocomplete="username" spellcheck="false"></label><label>Senha<input id="lgP" type="password" autocomplete="current-password"></label><label class="lgRem"><input type="checkbox" id="lgRem" checked>Lembrar neste computador</label><button class="btn amber" id="lgBtn" type="submit">Entrar</button><div id="lgErr"></div><div class="note">Os dados deste arquivo são criptografados e só abrem com o usuário e a senha corretos.</div></form></div>
 <div id="overlay" class="hide"><div class="brand">LOC <b>FROTAS</b></div><div class="bar"><i></i></div><div id="ovMsg">Carregando base…</div></div>
 <div id="adm"><form class="bracket" autocomplete="off"><h3>Senha do administrador</h3><div class="note">Necessária para carregar uma nova base no painel.</div><input type="password" id="admPw" placeholder="Senha de atualização" autocomplete="off"><div id="admErr"></div><div class="row"><button type="button" class="btn" id="admCancel">Cancelar</button><button type="submit" class="btn amber">Liberar</button></div></form></div>
 <div id="tip"></div><div id="toast"></div>
@@ -1285,14 +1288,18 @@ $('lgForm').onsubmit=async e=>{
   let raw;
   try{const key=await deriveKey(u,pw,PAY.salt);raw=await decB(key,PAY.iv,PAY.ct);KEY=key}
   catch(err){b.disabled=false;b.textContent='Entrar';er.textContent='Usuário ou senha inválidos.';$('lgP').value='';$('lgP').focus();return}
+  if($('lgRem').checked)await IDB.set('lkey',KEY);else IDB.del('lkey');
+  enter(raw);
+};
+async function enter(raw){
   $('login').remove();overlay('Carregando base…');
   try{
     let st=LOCCORE.unpack(await gunzip(raw));raw=null;
     IDB.del('base');IDB.del('base_enc'); // limpa cópias locais de versões antigas
     setStore(st);overlayOff();
   }catch(e){overlay('Erro ao carregar: '+esc(e.message||e),true)}
-};
-$('btnOut').onclick=()=>{try{sessionStorage.removeItem('loc-adm')}catch(e){}location.reload()};
+}
+$('btnOut').onclick=async()=>{try{sessionStorage.removeItem('loc-adm')}catch(e){}await IDB.del('lkey');location.reload()};
 $('btnPub').onclick=async()=>{
   if(!PENDING||!KEY)return;const b=$('btnPub');b.disabled=true;b.textContent='Gerando…';
   try{const gz=await gzip(PENDING);const enc=await encB(KEY,gz);const out=new Uint8Array(16+12+enc.ct.length);out.set(PAY.salt,0);out.set(enc.iv,16);out.set(enc.ct,28);
@@ -1300,7 +1307,12 @@ $('btnPub').onclick=async()=>{
     toast('<b style="color:var(--green)">base.enc gerado</b><br>Agora no GitHub: repositório historico-manutencao → Add file → Upload files → arraste o base.enc (substitui o antigo) → Commit changes. Em até ~10 min os analistas veem a base nova.',20000)}
   catch(e){toast('Erro ao gerar: '+esc(e.message||e),8000)}
   b.disabled=false;b.textContent='Gerar base.enc para publicar'};
-$('lgU').focus();
+// login lembrado: a chave fica guardada só neste navegador (não exportável; a senha não é salva)
+(async()=>{const showLg=()=>{const l=$('login');if(l){l.classList.remove('chk');$('lgU').focus()}};
+  let k=null;try{k=await IDB.get('lkey')}catch(e){}
+  if(!k||!window.crypto||!crypto.subtle)return showLg();
+  try{await payP;const raw=await decB(k,PAY.iv,PAY.ct);KEY=k;enter(raw)}catch(e){IDB.del('lkey');showLg()}
+})();
 })();
 </script>
 </body>
