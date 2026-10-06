@@ -56,7 +56,12 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .ms .pop .acts{display:flex;gap:6px;margin-bottom:6px}
 .ms .pop .acts .btn{height:26px;padding:3px 8px;font-size:11px}
 .ms .pop input[type=text]{width:100%;margin-bottom:6px}
-.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabsw{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:2px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth;margin-bottom:-1px}
+.tabs::-webkit-scrollbar{display:none}
+.tabarr{flex:none;width:34px;background:var(--panel2);border:1px solid var(--line);border-bottom:none;color:var(--amber);font-size:20px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0}
+.tabarr:hover{background:var(--navy);color:#fff}
+.tabarr.on{display:flex}
 .tab{padding:9px 14px;cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid transparent;border-bottom:none;white-space:nowrap}
 .tab:hover{color:var(--text)}
 .tab.on{color:var(--amber);background:var(--panel);border-color:var(--line);margin-bottom:-1px}
@@ -221,7 +226,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="f"><label>Abertura até</label><input type="date" id="fAte"></div>
     <div class="f keep" style="display:flex;gap:8px;align-items:center;grid-column:span 2"><button class="btn" id="tgl">▲ Recolher filtros</button><button class="btn" id="clr">Limpar filtros</button><span id="nAct"></span></div>
   </div>
-  <div class="tabs" id="tabs">
+  <div class="tabsw"><button type="button" class="tabarr" id="tabL" title="Ver abas anteriores">‹</button><div class="tabs" id="tabs">
     <div class="tab on" data-v="itens">Itens de OS</div>
     <div class="tab" data-v="km">Consulta de KM</div>
     <div class="tab" data-v="bat">Baterias</div>
@@ -235,7 +240,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="tab" data-v="cli">Por cliente</div>
     <div class="tab" data-v="clicar">Clientes por carro</div>
     <div class="tab" data-v="obs">Observações</div>
-  </div>
+  </div><button type="button" class="tabarr" id="tabR" title="Ver mais abas">›</button></div>
 
   <section class="view on" id="v-itens">
     <div class="tbar"><input class="pf" id="pfItens" list="dlProd" placeholder="Filtrar produto…"><div class="seg" id="segBtns" title="Leves e pesados classificados pelo grupo do modelo (veja Observações)"><button type="button" data-s="0" class="on">Geral</button><button type="button" data-s="1">Leves</button><button type="button" data-s="2">Pesados</button></div><div class="ms" id="colPick" style="width:150px"><button type="button">Colunas ▾</button><div class="pop"></div></div><span id="cntItens"></span><div class="sp"><div class="upd updSlot" style="display:none"></div><button class="btn amber" id="csv">Exportar CSV (filtrado)</button></div></div>
@@ -1169,6 +1174,12 @@ const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderG
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
 function go(t){curTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
+(function(){const tb=$('tabs'),L=$('tabL'),R=$('tabR');
+  const upd=()=>{const max=tb.scrollWidth-tb.clientWidth;L.classList.toggle('on',tb.scrollLeft>2);R.classList.toggle('on',tb.scrollLeft<max-2)};
+  L.onclick=()=>{tb.scrollLeft-=Math.max(200,tb.clientWidth*0.7)};R.onclick=()=>{tb.scrollLeft+=Math.max(200,tb.clientWidth*0.7)};
+  tb.addEventListener('scroll',upd);addEventListener('resize',upd);tb.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&tb.scrollWidth>tb.clientWidth){tb.scrollLeft+=e.deltaY;e.preventDefault()}},{passive:false});
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>t.scrollIntoView({block:'nearest',inline:'nearest'})));
+  setTimeout(upd,50);setTimeout(upd,600)})();
 let tmr;q.oninput=()=>{clearTimeout(tmr);tmr=setTimeout(applyFilters,300)};
 ['fDe','fAte'].forEach(id=>$(id).onchange=applyFilters);
 (function(){let c=false;try{c=localStorage.getItem('loc-kcol')==='1'}catch(e){}const set=v=>{document.body.classList.toggle('kcol',v);$('tglK').textContent=v?'▼ Mostrar indicadores':'▲ Recolher indicadores';try{localStorage.setItem('loc-kcol',v?'1':'0')}catch(e){}};set(c);$('tglK').onclick=()=>set(!document.body.classList.contains('kcol'))})();
@@ -1206,7 +1217,7 @@ self.onmessage=function(e){
 };`;
 function sheetSrc(){return new TextDecoder().decode(Uint8Array.from(atob($('sheetjs').textContent.trim()),c=>c.charCodeAt(0)))}
 function blobURL(txt,type){return URL.createObjectURL(new Blob([txt],{type:type||'text/javascript'}))}
-const ADM={salt:'5e1d0815e0dbccb9db75f43ea6704b1a',hash:'b80439e3c76ed83bbee06c4a1e16a724456ec140c84415af20889fc408787bd0'};let admOk=false;
+const ADM={salt:'3f4ff16c29441f1ce563d1ee729cf51b',hash:'b6d755ed71dd6e44df4fb4931c97c4fef888c02fdadd4fda9b47a3026c683d2e'};let admOk=false;
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 try{admOk=sessionStorage.getItem('loc-adm')===ADM.hash}catch(e){}
 function admClose(){$('adm').classList.remove('on');$('admPw').value='';$('admErr').textContent=''}
