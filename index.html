@@ -114,6 +114,10 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .chart svg{display:block;width:100%}
 .chart text{font-family:var(--mono);font-size:11px;fill:var(--text2)}
 .chart .ax{fill:var(--muted);font-size:10px}
+.pkw{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:8px 0 12px}.pk{background:var(--panel2);border:1px solid var(--line);padding:9px 12px}.pkl{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.pkv{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--text);margin-top:3px}.pks{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:2px}
+.pg1{fill:var(--text);font-family:var(--mono);font-size:11px;font-weight:700}.pg2{fill:var(--text2);font-family:var(--mono);font-size:10px}.pn{fill:var(--text2);font-family:var(--mono);font-size:10px}
+.ptab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}.ptab th{text-align:left;color:var(--muted);font-weight:400;font-size:11px;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}.ptab td{padding:6px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}.ptab .num{text-align:right}.ptab tbody tr.prow:hover td{background:var(--amber-dim)}.ptab .pexp{color:var(--amber);display:inline-block;width:12px}.pdet>td{background:var(--bg);padding:6px 8px 12px!important}.pdet .pbox{max-height:300px;overflow:auto}.pdet .pit thead th{position:sticky;top:0;background:var(--bg);z-index:1}
+#prevPin{display:none;position:absolute;z-index:20;width:380px;max-width:calc(100% - 8px);max-height:320px;overflow:auto;background:#0E1424;border:1px solid var(--amber);padding:10px 12px;font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.55;box-shadow:0 6px 20px rgba(0,0,0,.5)}#prevPin .pinx{position:sticky;top:0;float:right;background:var(--panel2);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:11px;padding:2px 7px;margin-left:6px}.pit{width:100%;border-collapse:collapse;font-size:11.5px}.pit th{color:var(--muted);font-weight:400;text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}.pit td{padding:4px 8px;border-bottom:1px solid var(--grid);white-space:normal}.pit .num{text-align:right;white-space:nowrap}.pit tr.ptot td{font-weight:700;color:var(--text);border-bottom:0}
 .legend{display:flex;gap:16px;font-family:var(--mono);font-size:11px;color:var(--text2);margin:4px 0 8px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 #tip{position:fixed;pointer-events:none;z-index:200;background:#0E1424;border:1px solid var(--amber);padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--text);display:none;max-width:360px;line-height:1.55;box-shadow:0 6px 20px rgba(0,0,0,.5)}
@@ -245,6 +249,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="tab on" data-v="itens">Itens de OS</div>
     <div class="tab" data-v="km">Consulta de KM</div>
     <div class="tab" data-v="bat">Baterias</div>
+    <div class="tab" data-v="prev">Linha de preventiva</div>
     <div class="tab" data-v="alertas">Alertas e qualidade</div>
     <div class="tab" data-v="modelo">Custo por modelo</div>
     <div class="tab" data-v="mensal">Evolução mensal</div>
@@ -324,6 +329,11 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="tbar"><input class="pf" id="pfBat" placeholder="Pesquisar placa, modelo, cliente ou bateria…" style="width:300px"><div class="seg" id="batSeg"><button type="button" data-s="0" class="on">Todas</button><button type="button" data-s="1">Com troca</button><button type="button" data-s="2">Nunca trocou</button><button type="button" data-s="3">Com recarga/teste</button></div><div class="seg" id="batSeg2"><button type="button" data-s="0" class="on">Custo: todos</button><button type="button" data-s="1">Cliente hoje</button><button type="button" data-s="2">LOC hoje</button><button type="button" data-s="3">Troca &lt; 18m sem reembolso</button></div><div class="seg" id="batSeg3"><button type="button" data-s="0" class="on">Geral</button><button type="button" data-s="1">Leves</button><button type="button" data-s="2">Pesados</button></div><span id="cntBat"></span><div class="sp"><button class="btn amber" id="csvBat">Exportar CSV</button></div></div>
     <div id="batHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
     <div class="vt" id="vtBat"></div>
+  </section>
+
+  <section class="view" id="v-prev">
+    <div class="tbar"><input class="pf" id="pfPrev" list="dlPrev" placeholder="Digite a placa…" autocomplete="off" style="width:220px;text-transform:uppercase"><datalist id="dlPrev"></datalist><span id="cntPrev"></span><span class="note">Preventiva = OS com item do grupo 01.02.02 (Mão de Obra Revisões Programadas) ou produto “Revisão …”. Mostra todas as OS da placa, sem os filtros do topo, para não esconder nenhum item.</span></div>
+    <div id="prevBox"></div>
   </section>
 
   <section class="view" id="v-clicar">
@@ -561,7 +571,7 @@ let S=null,N=0,F={},Dt={},has={};
 let YEAR,MK,LOW={},CORR=-1,isCorr;
 let idx=new Uint32Array(0),idxI=new Uint32Array(0);
 const dirty={};let curTab='itens';
-const TABS=['itens','km','bat','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
+const TABS=['itens','km','bat','prev','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
 const val=(k,i)=>{const f=S.fields[k];if(!f)return null;const v=f.data[i];if(f.dict)return v<0?null:f.dict[v];if(f.type==='d')return v<0?null:v;if(f.type==='i')return v<0?null:v;return isNaN(v)?null:v};
 const num=(k,i)=>{const v=F[k]?F[k][i]:NaN;return isNaN(v)?0:v};
 
@@ -1215,8 +1225,97 @@ function dqCards(){
     box('Sem fornecedor',fmtI.format(semForn),'linhas')+box('Sem grupo de despesa',fmtI.format(semG),'linhas')+box('Sem cliente',fmtI.format(semCli),'linhas');
 }
 
+// ---- linha de preventiva (por placa)
+// Preventiva = OS com algum item do grupo 01.02.02 (Mão de Obra Revisões Programadas) ou produto "Revisão ..." / "Manutenção preventiva"
+const PREV_RX=/^(mao de obra (de )?)?revis(ao|oes)( de)?( preventiva)?( [\d.]+ ?(km)?)?$|^revisao preventiva|^manutencao preventiva|^mao de obra preventiva|^revisao (de )?[\d.]+ ?km/;
+let PRVM=null,prevSel=null,prevOpen=new Set(),prevPk=-1;const pfPrev=$('pfPrev');
+const nrmS=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+function prevMasks(){if(PRVM&&PRVM.np===Dt.produto.length&&PRVM.ng===(Dt.gdesp||[]).length)return PRVM;
+  const p=new Uint8Array(Dt.produto.length),g=new Uint8Array((Dt.gdesp||[]).length),rk=new Float64Array(Dt.produto.length);
+  Dt.produto.forEach((v,j)=>{const s=nrmS(v);if(PREV_RX.test(s)){p[j]=1;const m=s.match(/revisao (?:de )?([\d.]+)\s*(km)?/);if(m){const k=+m[1].replace(/\./g,'');if(k>=1000&&k<2e6)rk[j]=k}}});
+  (Dt.gdesp||[]).forEach((v,j)=>{if(/^01\.02\.02\b/.test(String(v||'')))g[j]=1});
+  PRVM={np:Dt.produto.length,ng:(Dt.gdesp||[]).length,p,g,rk};return PRVM}
+function renderPrev(){
+  if(!has.produto){$('prevBox').innerHTML='<div class="note">A base não tem a coluna Produto.</div>';return}
+  const dl=$('dlPrev');if(!dl.dataset.n||+dl.dataset.n!==Dt.placa.length){const M=prevMasks(),seen=new Uint8Array(Dt.placa.length);for(let i=0;i<N;i++){const pd=F.produto[i],gd=F.gdesp?F.gdesp[i]:-1;if((pd>=0&&M.p[pd])||(gd>=0&&M.g[gd]))seen[F.placa[i]]=1}
+    let h='';for(let k=0;k<seen.length;k++)if(seen[k])h+=`<option value="${esc(Dt.placa[k])}">`;dl.innerHTML=h;dl.dataset.n=Dt.placa.length}
+  drawPrev()}
+function prevData(pk){
+  const M=prevMasks(),okK=k=>isFinite(k)&&k>=10&&k<2e6,os=new Map();let lastKm=null,lastKmD=-1,lastD=-1,li=-1;
+  const PL=F.placa;for(let i=0;i<N;i++){if(PL[i]!==pk)continue;const a=F.abert[i],k=F.km?F.km[i]:NaN;
+    if(okK(k)&&(a>lastKmD||(a===lastKmD&&k>lastKm))){lastKm=k;lastKmD=a}if(a>lastD){lastD=a;li=i}
+    let o=os.get(F.os[i]);if(!o){o={os:F.os[i],a,km:null,prev:false,rk:0,it:new Map(),tot:0,forn:''};os.set(F.os[i],o)}
+    if(a>=0&&(o.a<0||a<o.a))o.a=a;if(okK(k)&&(o.km==null||k>o.km))o.km=k;
+    const pd=F.produto[i],gd=F.gdesp?F.gdesp[i]:-1;if((pd>=0&&M.p[pd])||(gd>=0&&M.g[gd]))o.prev=true;if(pd>=0&&M.rk[pd]>o.rk)o.rk=M.rk[pd];
+    o.it.set(i,{nm:pd>=0?Dt.produto[pd]:'(sem produto)',q:F.qtd?(F.qtd[i]||0):0,vu:F.vunit?F.vunit[i]:null,v:F.total[i]||0,re:F.reemb?(F.reemb[i]||0):0,g:gd>=0?String(Dt.gdesp[gd]).replace(/^[\d.]+\s*-\s*/,''):'',pv:(pd>=0&&M.p[pd])||(gd>=0&&M.g[gd])});o.tot+=F.total[i]||0;
+    if(!o.forn&&F.forn&&F.forn[i]>=0)o.forn=Dt.forn[F.forn[i]]}
+  const L=[...os.values()].filter(o=>o.prev).sort((a,b)=>(a.a-b.a)||(a.os-b.os));
+  let pkm=null,pd=null;L.forEach((o,k)=>{o.n=k+1;o.dd=k?o.a-L[k-1].a:null;o.dk=o.km!=null&&pkm!=null?o.km-pkm:null;if(o.km!=null)pkm=o.km;o.items=[...o.it.values()].sort((a,b)=>b.v-a.v)});
+  const nm=(f)=>li>=0&&F[f]&&F[f][li]>=0?Dt[f][F[f][li]]:'';
+  return {L,lastKm,lastKmD,modelo:nm('modelo'),cliente:nm('cliente'),marca:nm('marca')}}
+function prevTip(o,full){const lab=o.rk?'Revisão '+fmtI.format(o.rk)+' km':'Preventiva';
+  const MX=12,its=(full?o.items:o.items.slice(0,MX)).map(e=>`<tr><td style="padding-right:8px">${cN(e.q)}×</td><td style="padding-right:10px">${esc(e.nm)}</td><td style="text-align:right">${cM(e.v)}</td></tr>`).join('');
+  return `<b>${o.n}ª preventiva · ${lab}</b><br>OS ${o.os} · ${cD(o.a)} · ${o.km!=null?'<b>'+cI(o.km)+' km</b>':'KM não informado'}<br><span style="color:var(--muted)">${esc(o.forn)}</span>`+
+    (o.n>1?`<br>Desde a anterior: <b>${o.dk!=null?(o.dk>=0?'+':'')+cI(o.dk)+' km':'KM —'}</b> · <b>${cI(o.dd)} dias</b>`:'')+
+    `<table style="margin-top:6px;border-collapse:collapse;font-size:11px">${its}</table>`+(!full&&o.items.length>MX?`<span class="warn">+ ${o.items.length-MX} item(ns) · clique na bolinha para ver todos</span><br>`:'')+`<b>${fmtI.format(o.items.length)} item(ns) · Total da OS: ${cM(o.tot)}</b>`+(full?'':'<br><span style="color:var(--muted)">Clique na bolinha para fixar esta lista</span>')}
+function drawPrev(){
+  const box=$('prevBox'),t=nrmS(pfPrev.value).toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!t){box.innerHTML='<div class="bracket card"><div class="note">Digite a placa acima para ver a linha de preventivas. A lista sugere as placas que têm preventiva.</div></div>';$('cntPrev').textContent='';return}
+  const pk=Dt.placa.findIndex(p=>String(p).toUpperCase().replace(/[^A-Z0-9]/g,'')===t);
+  if(pk<0){box.innerHTML='<div class="bracket card"><div class="note">Placa não encontrada na base.</div></div>';$('cntPrev').textContent='';return}
+  if(pk!==prevPk){prevOpen=new Set();prevPk=pk}
+  const D=prevData(pk),L=D.L,pla=Dt.placa[pk];
+  const head=`<h3>Linha de preventiva · <span class="warn">${esc(pla)}</span> <span style="color:var(--muted);font-weight:400;font-size:12px">${esc(D.modelo)} · ${esc(D.cliente)} · último KM ${D.lastKm!=null?cI(D.lastKm)+' ('+cD(D.lastKmD)+')':'—'}</span></h3>`;
+  if(!L.length){box.innerHTML=`<div class="bracket card">${head}<div class="note">Nenhuma preventiva encontrada para esta placa.</div></div>`;$('cntPrev').textContent='0 preventivas';return}
+  const ints=L.slice(1),dks=ints.map(o=>o.dk).filter(v=>v!=null&&v>=0),dds=ints.map(o=>o.dd).filter(v=>v!=null),avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  const last=L[L.length-1],sinceD=today-last.a,sinceK=D.lastKm!=null&&last.km!=null&&D.lastKmD>=last.a?D.lastKm-last.km:null;
+  const kpi=(l,v,s)=>`<div class="pk"><div class="pkl">${l}</div><div class="pkv">${v}</div>${s?`<div class="pks">${s}</div>`:''}</div>`;
+  const kp=`<div class="pkw">${kpi('Preventivas',fmtI.format(L.length),'de '+cD(L[0].a)+' a '+cD(last.a))}${kpi('Média entre preventivas',avg(dks)!=null?cI(Math.round(avg(dks)))+' km':'—',avg(dds)!=null?cI(Math.round(avg(dds)))+' dias':'')}${kpi('Desde a última',cI(sinceD)+' dias',sinceK!=null?cI(sinceK)+' km rodados (último KM informado)':'')}${kpi('Custo das preventivas',cM(L.reduce((a,o)=>a+o.tot,0)),'média '+cM(L.reduce((a,o)=>a+o.tot,0)/L.length)+' por OS')}</div>`;
+  // ---- gráfico: KM x data, uma bolinha por preventiva, diferença entre elas no meio de cada trecho
+  const W=Math.max($('prevBox').clientWidth-40||900,520),H=340,Lm=78,Rm=28,T=34,B=34,pw=W-Lm-Rm,ph=H-T-B;
+  const kms=L.map(o=>o.km).filter(v=>v!=null),kmax=Math.max(...kms,1),ticks=niceTicks(0,kmax,5),tmax=ticks[ticks.length-1];
+  let d0=L[0].a,d1=last.a;if(d1-d0<60){d0-=30;d1+=30}const pad=(d1-d0)*0.04;d0-=pad;d1+=pad;
+  const X=d=>Lm+(d-d0)/(d1-d0)*pw,Y=v=>T+ph-v/tmax*ph;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="KM em cada preventiva da placa ${esc(pla)}">`;
+  ticks.forEach(v=>{s+=`<line x1="${Lm}" x2="${W-Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text class="ax" x="${Lm-8}" y="${Y(v)+3}" text-anchor="end">${v>=1000?fmtI.format(v/1000)+' mil':fmtI.format(v)} km</text>`});
+  // eixo x: meses
+  const m0=new Date(d0*864e5),m1=new Date(d1*864e5);let months=[];for(let y=m0.getUTCFullYear(),m=m0.getUTCMonth()+1;y<m1.getUTCFullYear()||(y===m1.getUTCFullYear()&&m<=m1.getUTCMonth());m++){if(m>11){m=0;y++}months.push(Date.UTC(y,m,1)/864e5)}
+  const stepM=Math.max(1,Math.ceil(months.length/Math.max(4,Math.floor(pw/90))));months.forEach((d,k)=>{if(k%stepM)return;const x=X(d);const dt=new Date(d*864e5);s+=`<line x1="${x}" x2="${x}" y1="${T+ph}" y2="${T+ph+4}" stroke="var(--line)"/><text class="ax" x="${x}" y="${H-12}" text-anchor="middle">${MES[dt.getUTCMonth()]}/${String(dt.getUTCFullYear()).slice(2)}</text>`});
+  s+=`<line x1="${Lm}" x2="${W-Rm}" y1="${T+ph}" y2="${T+ph}" stroke="var(--line)"/>`;
+  const P=L.map(o=>({o,x:X(o.a),y:o.km!=null?Y(o.km):T+ph}));
+  let path='';P.forEach(p=>{if(p.o.km==null)return;path+=(path?'L':'M')+p.x.toFixed(1)+','+p.y.toFixed(1)});
+  s+=`<path d="${path}" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linejoin="round" opacity=".85"/>`;
+  // rótulos de diferença entre preventivas
+  for(let k=1;k<P.length;k++){const a=P[k-1],b=P[k],o=b.o,gap=b.x-a.x;if(gap<64)continue;const mx=(a.x+b.x)/2,my=Math.min(a.y,b.y)-14;
+    const l1=o.dk!=null?(o.dk>=0?'+':'')+cI(o.dk)+' km':'KM —',l2=cI(o.dd)+' dias';
+    s+=`<g class="pgap"><rect x="${mx-44}" y="${my-24}" width="88" height="30" rx="4" fill="var(--panel2)" stroke="var(--line)"/><text x="${mx}" y="${my-11}" text-anchor="middle" class="pg1">${l1}</text><text x="${mx}" y="${my+1}" text-anchor="middle" class="pg2">${l2}</text></g>`}
+  P.forEach((p,k)=>{const o=p.o;s+=`<g class="ppt" data-k="${k}" style="cursor:pointer"><circle cx="${p.x}" cy="${p.y}" r="16" fill="transparent"/><circle class="pc" cx="${p.x}" cy="${p.y}" r="6" fill="${o.km!=null?'var(--amber)':'var(--panel)'}" stroke="${o.km!=null?'var(--panel)':'var(--amber)'}" stroke-width="2"/>`+
+    (P.length<=24?`<text x="${p.x}" y="${p.y+20}" text-anchor="middle" class="pn">${o.n}ª</text>`:'')+`</g>`});
+  s+='</svg>';
+  const note=P.some(p=>p.o.km==null)?'<div class="note">Bolinha vazada na base do gráfico = preventiva sem KM informado.</div>':'';
+  const neg=L.some(o=>o.dk!=null&&o.dk<0)?'<div class="note"><span class="neg">⚠</span> Há preventiva com KM menor que a anterior: provável erro de digitação do KM na OS. A média de KM ignora esses trechos.</div>':'';
+  const hid=P.length>1&&P.some((p,k)=>k&&p.x-P[k-1].x<64)?'<div class="note">Algumas diferenças não cabem no gráfico; estão na tabela abaixo e ao passar o mouse.</div>':'';
+  // tabela
+  const det=o=>`<tr class="pdet" data-d="${o.os}"${prevOpen.has(o.os)?'':' style="display:none"'}><td></td><td colspan="9"><div class="pbox"><table class="pit"><thead><tr><th class="num">Qtd</th><th>Produto</th><th>Grupo de despesa</th><th class="num">Valor unit.</th><th class="num">Valor total</th><th class="num">Reembolso</th></tr></thead><tbody>${o.items.map(e=>`<tr><td class="num">${cN(e.q)}</td><td>${esc(e.nm)}${e.pv?' <span class="tag t" title="Item que identifica a OS como preventiva">revisão</span>':''}</td><td style="color:var(--text2)">${esc(e.g)}</td><td class="num">${e.vu!=null?cM(e.vu):''}</td><td class="num">${cM(e.v)}</td><td class="num">${e.re?cM(e.re):''}</td></tr>`).join('')}<tr class="ptot"><td></td><td colspan="3">${fmtI.format(o.items.length)} item(ns) na OS ${o.os}</td><td class="num">${cM(o.tot)}</td><td class="num">${cM(o.items.reduce((a,e)=>a+e.re,0))}</td></tr></tbody></table></div></td></tr>`;
+  const rows=L.slice().reverse().map(o=>`<tr data-os="${o.os}" class="prow"><td class="num"><span class="pexp">${prevOpen.has(o.os)?'▾':'▸'}</span> ${o.n}ª</td><td>${cD(o.a)}</td><td class="num">${o.os}</td><td>${o.rk?'Revisão '+fmtI.format(o.rk)+' km':'<span style="color:var(--muted)">—</span>'}</td><td class="num">${o.km!=null?cI(o.km):'<span style="color:var(--muted)">não informado</span>'}</td><td class="num">${o.n>1?(o.dk!=null?(o.dk>=0?'+':'<span class="neg" title="KM menor que o da preventiva anterior: provável erro de digitação do KM">⚠ ')+cI(o.dk)+(o.dk<0?'</span>':''):'—'):''}</td><td class="num">${o.n>1?cI(o.dd):''}</td><td class="num">${fmtI.format(o.items.length)}</td><td class="num">${cM(o.tot)}</td><td>${esc(o.forn)}</td></tr>`+det(o)).join('');
+  box.innerHTML=`<div class="bracket card">${head}${kp}<div class="legend"><span><i style="background:var(--amber)"></i>KM em cada preventiva</span><span style="color:var(--muted)">Passe o mouse numa bolinha para ver os itens da OS · entre as bolinhas: diferença de KM e de tempo</span></div><div class="chart" id="chPrev" style="position:relative">${s}<div id="prevPin"></div></div>${note}${neg}${hid}</div>
+  <div class="bracket card" style="margin-top:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Preventivas da placa</h3><span class="note">Clique numa linha para abrir todos os itens da OS (inclusive os que não são de revisão)</span><span style="margin-left:auto;display:flex;gap:6px"><button class="btn" id="prevAll">Abrir todas</button><button class="btn" id="prevNone">Fechar todas</button></span></div><div style="overflow:auto"><table class="ptab"><thead><tr><th class="num">Nº</th><th>Data</th><th class="num">OS</th><th>Revisão</th><th class="num">KM</th><th class="num">Δ KM</th><th class="num">Δ dias</th><th class="num">Itens na OS</th><th class="num">Valor</th><th>Fornecedor</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div style="margin-top:8px"><button class="btn" id="prevGo">Ver todos os itens desta placa</button></div></div>`;
+  const pin=$('prevPin'),chw=$('chPrev');
+  box.querySelectorAll('.ppt').forEach(g=>{const o=L[+g.dataset.k],c=g.querySelector('.pc');g.onmousemove=e=>{if(pin.style.display==='block')return;c.setAttribute('r','8');showTip(e,prevTip(o))};g.onmouseleave=()=>{c.setAttribute('r','6');hideTip()};
+    g.onclick=e=>{e.stopPropagation();hideTip();pin.innerHTML='<button type="button" class="pinx" title="Fechar">✕</button><div class="pinb">'+prevTip(o,true)+'</div>';pin.style.display='block';const r=chw.getBoundingClientRect(),cx=e.clientX-r.left,w=pin.offsetWidth;pin.style.left=Math.max(4,Math.min(cx+14,r.width-w-4))+'px';pin.style.top='8px';pin.querySelector('.pinx').onclick=ev=>{ev.stopPropagation();pin.style.display='none'}}});
+  pin.onclick=e=>e.stopPropagation();chw.onclick=()=>{pin.style.display='none'};
+  const tg=(os,on)=>{const d=box.querySelector(`tr.pdet[data-d="${os}"]`),r=box.querySelector(`tr.prow[data-os="${os}"] .pexp`);if(!d)return;if(on==null)on=d.style.display==='none';d.style.display=on?'':'none';r.textContent=on?'▾':'▸';if(on)prevOpen.add(+os);else prevOpen.delete(+os)};
+  box.querySelectorAll('tr.prow').forEach(tr=>{tr.style.cursor='pointer';tr.onclick=()=>tg(tr.dataset.os)});
+  $('prevAll').onclick=()=>L.forEach(o=>tg(o.os,true));$('prevNone').onclick=()=>L.forEach(o=>tg(o.os,false));
+  $('prevGo').onclick=()=>{q.value=pla;applyFilters();go('itens')};
+  $('cntPrev').textContent=fmtI.format(L.length)+' preventiva(s)'}
+let tPv;pfPrev.oninput=()=>{clearTimeout(tPv);tPv=setTimeout(()=>{if(S)drawPrev()},250)};
+pfPrev.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(tPv);if(S)drawPrev()}};
+addEventListener('resize',()=>{if(curTab==='prev'&&S&&pfPrev.value.trim()){clearTimeout(tPv);tPv=setTimeout(drawPrev,200)}});
+
 // ================= navegação =================
-const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,obs:()=>updBadge()};
+const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,prev:renderPrev,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
 function go(t){curTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
