@@ -327,7 +327,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   </section>
 
   <section class="view" id="v-pm">
-    <div class="tbar"><input class="pf" id="pfPmPl" placeholder="Placa" autocomplete="off" style="width:150px;text-transform:uppercase"><div class="ms" id="msPmMo" style="width:260px"><button type="button">Modelo: todos</button><div class="pop"></div></div><input class="pf" id="pfPmIt" placeholder="Item (ex.: pastilha, oleo 5w30)" autocomplete="off" style="width:280px"><button class="btn" id="pmClr">Limpar</button><span id="cntPm"></span><span class="note">Preço médio = valor total ÷ quantidade (linhas com valor ou quantidade zerada não entram na média). Usa a base inteira, sem os filtros do topo. Clique num item para ver o histórico de preço.</span><div class="sp"><button class="btn amber" id="csvPm">Exportar CSV</button></div></div>
+    <div class="tbar"><input class="pf" id="pfPmPl" placeholder="Placa" autocomplete="off" style="width:150px;text-transform:uppercase"><div class="ms" id="msPmMo" style="width:260px"><button type="button">Modelo: todos</button><div class="pop"></div></div><div class="ms" id="msPmIt" style="width:300px"><button type="button">Item: todos</button><div class="pop"></div></div><button class="btn" id="pmClr">Limpar</button><span id="cntPm"></span><span class="note">Preço médio = valor total ÷ quantidade (linhas com valor ou quantidade zerada não entram na média). Usa a base inteira, sem os filtros do topo. Clique num item para ver o histórico de preço.</span><div class="sp"><button class="btn amber" id="csvPm">Exportar CSV</button></div></div>
     <div id="pmTot"></div>
     <div id="pmHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
     <div class="vt" id="vtPm"></div>
@@ -1436,13 +1436,13 @@ pfPn.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(tPn);if(S)drawPn()}};
 addEventListener('resize',()=>{if(curTab==='pn'&&S&&pfPn.value.trim()){clearTimeout(tPn);tPn=setTimeout(drawPn,200)}});
 
 // ---- preço médio por item (filtro de placa e de item; usa a base inteira, sem os filtros do topo)
-let vtPm=null,pmRows=[],pmSel=-1,pmCache=null;const pfPmPl=$('pfPmPl'),pfPmIt=$('pfPmIt');let pmMo=new Set();
+let vtPm=null,pmRows=[],pmSel=-1,pmCache=null;const pfPmPl=$('pfPmPl');let pmMo=new Set(),pmIt=new Set(),PMIT=null;
 function pmMasks(){
-  const tp=pfPmPl.value.toUpperCase().replace(/[^A-Z0-9]/g,''),ti=nrmS(pfPmIt.value).split(/\s+/).filter(Boolean),tm=[...pmMo];
+  const tp=pfPmPl.value.toUpperCase().replace(/[^A-Z0-9]/g,''),ti=[...pmIt],tm=[...pmMo];
   let mp=null,mi=null,mm=null;
   if(tm.length&&Dt.modelo){mm=new Uint8Array(Dt.modelo.length);tm.forEach(j=>mm[j]=1)}
   if(tp){mp=new Uint8Array(Dt.placa.length);Dt.placa.forEach((p,j)=>{if(String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,'').includes(tp))mp[j]=1})}
-  if(ti.length){mi=new Uint8Array(Dt.produto.length);Dt.produto.forEach((p,j)=>{const s=nrmS(p);if(ti.every(w=>s.includes(w)))mi[j]=1})}
+  if(ti.length){mi=new Uint8Array(Dt.produto.length);ti.forEach(j=>mi[j]=1)}
   return {mp,mi,mm,tp,ti,tm}}
 // lista fixa com os modelos da frota (seleção múltipla, com busca)
 function pmMoLabel(){const b=$('msPmMo').querySelector('button');const n=pmMo.size;b.textContent=!n?'Modelo: todos':n===1?Dt.modelo[[...pmMo][0]]:n+' modelos';b.title=[...pmMo].map(j=>Dt.modelo[j]).join('\n');b.style.borderColor=n?'var(--amber)':''}
@@ -1457,9 +1457,27 @@ function pmMoBuild(){const el=$('msPmMo'),pop=el.querySelector('.pop');if(!Dt.mo
   srch.oninput=()=>{const t=nrmS(srch.value);pop.querySelectorAll('.lst label').forEach(l=>l.style.display=l.dataset.t.includes(t)?'':'none')};
   pop.querySelectorAll('.acts .btn').forEach(b=>b.onclick=()=>{if(b.dataset.a==='none')boxes.forEach(x=>x.checked=false);else boxes.forEach(x=>{if(x.parentElement.style.display!=='none')x.checked=true});apply()});
   boxes.forEach(b=>b.onchange=apply);pmMoLabel()}
+// lista fixa com os itens (produtos) da base: busca + seleção múltipla; mostra até 300 por vez
+function pmItLabel(){const b=$('msPmIt').querySelector('button');const n=pmIt.size;b.textContent=!n?'Item: todos':n===1?Dt.produto[[...pmIt][0]]:n+' itens';b.title=[...pmIt].slice(0,40).map(j=>Dt.produto[j]).join('\n')+(n>40?'\n…':'');b.style.borderColor=n?'var(--amber)':''}
+function pmItBuild(){const el=$('msPmIt'),pop=el.querySelector('.pop');if(PMIT&&PMIT.n===Dt.produto.length)return;
+  const cnt=new Uint32Array(Dt.produto.length);for(let i=0;i<N;i++){const p=F.produto[i];if(p>=0)cnt[p]++}
+  PMIT={n:Dt.produto.length,it:Dt.produto.map((m,j)=>({j,m:String(m||''),s:nrmS(m),c:cnt[j]})).filter(x=>x.m&&x.c).sort((a,b)=>a.m.localeCompare(b.m,'pt-BR'))};
+  pop.innerHTML='<input type="text" class="pf" placeholder="Procurar item… (ex.: pastilha dianteira, oleo 5w30)"><div class="acts"><button class="btn" data-a="vis">Marcar os da busca</button><button class="btn" data-a="sel">Ver marcados</button><button class="btn" data-a="none">Limpar</button></div><div class="note pmi-n" style="margin-bottom:4px"></div><div class="lst"></div>';
+  const btn=el.querySelector('button'),srch=pop.querySelector('input[type=text]'),lst=pop.querySelector('.lst'),note=pop.querySelector('.pmi-n'),LIM=300;let shown=[],onlySel=false;
+  const match=()=>{const w=nrmS(srch.value).split(/\s+/).filter(Boolean);return PMIT.it.filter(x=>(!onlySel||pmIt.has(x.j))&&w.every(t=>x.s.includes(t)))};
+  const paint=()=>{shown=match();lst.innerHTML=shown.slice(0,LIM).map(x=>`<label><input type="checkbox" value="${x.j}" ${pmIt.has(x.j)?'checked':''}>${esc(x.m)} <span style="color:var(--muted);margin-left:auto">${fmtI.format(x.c)}</span></label>`).join('')||'<div class="note" style="padding:6px">Nenhum item encontrado</div>';
+    updNote()};
+  const updNote=()=>{note.textContent=(shown.length>LIM?`Mostrando ${LIM} de ${fmtI.format(shown.length)} itens — refine a busca. `:`${fmtI.format(shown.length)} item(ns). `)+(pmIt.size?fmtI.format(pmIt.size)+' marcado(s). ':'')+'Número à direita = lançamentos na base.'};
+  const apply=()=>{pmItLabel();clearTimeout(tPm);tPm=setTimeout(()=>{pmSel=-1;if(S)renderPm()},300)};
+  btn.onclick=e=>{e.stopPropagation();const was=el.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was){onlySel=false;paint();el.classList.add('open');srch.focus()}};
+  pop.onclick=e=>e.stopPropagation();
+  let tq;srch.oninput=()=>{clearTimeout(tq);tq=setTimeout(()=>{onlySel=false;paint()},150)};
+  lst.onchange=e=>{const b=e.target.closest('input[type=checkbox]');if(!b)return;if(b.checked)pmIt.add(+b.value);else pmIt.delete(+b.value);updNote();apply()};
+  pop.querySelectorAll('.acts .btn').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='none'){pmIt=new Set();onlySel=false}else if(a==='sel'){onlySel=!onlySel}else{match().forEach(x=>pmIt.add(x.j))}paint();if(a!=='sel')apply()});
+  pmItLabel()}
 function renderPm(){
   if(!has.produto){$('cntPm').textContent='A base não tem a coluna Produto.';return}
-  pmMoBuild();
+  pmMoBuild();pmItBuild();
   const {mp,mi,mm}=pmMasks(),MO=F.modelo,PL=F.placa,PR=F.produto,Q=F.qtd,T=F.total,VU=F.vunit,A=F.abert,m=new Map();
   let tq=0,tv=0,tqa=0,tva=0,nl=0;
   for(let i=0;i<N;i++){const pd=PR[i];if(pd<0)continue;if(mi&&!mi[pd])continue;if(mp&&(PL[i]<0||!mp[PL[i]]))continue;if(mm&&(!MO||MO[i]<0||!mm[MO[i]]))continue;
@@ -1499,8 +1517,8 @@ function pmHist(){
   const nm=(f,i)=>F[f]&&F[f][i]>=0?Dt[f][F[f][i]]:'';const MX=300;
   const tr=L.slice(0,MX).map(i=>{const q=F.qtd?(F.qtd[i]||0):0,v=F.total[i]||0,u=q>0&&v>0?v/q:null;return `<tr><td>${cD(F.abert[i])}</td><td class="warn">${esc(nm('placa',i))}</td><td class="num">${F.os[i]}</td><td>${esc(nm('modelo',i))}</td><td>${esc(nm('forn',i))}</td><td class="num">${cN(q)}</td><td class="num">${u!=null?cM(u):'<span style="color:var(--muted)">—</span>'}</td><td class="num">${cM(v)}</td><td class="num" style="color:var(--text2)">${u!=null&&r.pm?(u>r.pm?'+':'')+fmtN.format((u/r.pm-1)*100)+'%':''}</td></tr>`}).join('');
   box.innerHTML=`<h3>Histórico de preço · <span class="warn">${esc(r.nome)}</span></h3><div class="note" style="margin-bottom:8px">Preço médio <b>${r.pm!=null?cM(r.pm):'—'}</b> · menor ${cM(r.min)} · maior ${cM(r.max)} · ${cN(r.q)} unidade(s) em ${fmtI.format(r.n)} lançamento(s), ${fmtI.format(r.np)} placa(s).${L.length>MX?' Mostrando os '+MX+' mais recentes.':''}</div><div class="pbox" style="max-height:340px"><table><thead><tr><th>Data</th><th>Placa</th><th class="num">OS</th><th>Modelo</th><th>Fornecedor</th><th class="num">Qtd</th><th class="num">Preço unit.</th><th class="num">Valor total</th><th class="num">vs. médio</th></tr></thead><tbody>${tr}</tbody></table></div>`;box.style.display=''}
-let tPm;[pfPmPl,pfPmIt].forEach(el=>el.oninput=()=>{clearTimeout(tPm);tPm=setTimeout(()=>{pmSel=-1;if(S)renderPm()},300)});
-$('pmClr').onclick=()=>{pfPmPl.value='';pfPmIt.value='';pmMo=new Set();pmMoLabel();pmSel=-1;if(vtPm)vtPm.clearCF();if(S)renderPm()};
+let tPm;[pfPmPl].forEach(el=>el.oninput=()=>{clearTimeout(tPm);tPm=setTimeout(()=>{pmSel=-1;if(S)renderPm()},300)});
+$('pmClr').onclick=()=>{pfPmPl.value='';pmIt=new Set();pmItLabel();pmMo=new Set();pmMoLabel();pmSel=-1;if(vtPm)vtPm.clearCF();if(S)renderPm()};
 $('csvPm').onclick=()=>{if(!vtPm)return;const C=vtPm.cols();const lines=[C.map(c=>c.h).join(';')];
   for(const r of vtPm.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v).replace('.',',');v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='preco_medio.csv';a.click()};
