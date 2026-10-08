@@ -44,6 +44,7 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .btn:hover{border-color:var(--amber)}
 .btn.amber{background:var(--amber);color:#111;border-color:var(--amber);font-weight:600}
 #nAct{font-family:var(--mono);font-size:11px;color:var(--amber);white-space:nowrap}
+.filters.onlyq{display:flex;flex-wrap:wrap;gap:10px;align-items:end;padding-top:10px;padding-bottom:10px}.filters.onlyq .f:not(.keep){display:none!important}.filters.onlyq .f.wide{width:280px}.filters.onlyq .f.keep{grid-column:auto!important}.filters.onlyq #tgl{display:none}.filters.hideall{display:none!important}
 .ms{position:relative}
 .ms>button{text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ms .pop{display:none;position:absolute;z-index:20;top:34px;left:0;width:min(460px,90vw);max-height:360px;overflow:auto;background:var(--panel2);border:1px solid var(--amber);padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -232,7 +233,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   <div class="kbar"><button class="btn" id="tglK">▲ Recolher indicadores</button><span id="kpiMini" class="kmini"></span></div>
   <div class="kpis" id="kpis"></div>
   <div class="filters bracket" id="fcard">
-    <div class="f wide keep"><label>Busca (placa, OS, produto, fornecedor, cliente)</label><input id="q" placeholder="ex.: SIW0C82 ou correia"></div>
+    <div class="f wide keep"><label id="qLab">Busca (placa, OS, produto, fornecedor, cliente)</label><input id="q" placeholder="ex.: SIW0C82 ou correia"></div>
     <div class="f"><label>Grupo de despesa</label><div class="ms" id="msG"><button type="button">Todos</button><div class="pop"></div></div></div>
     <div class="f"><label>Tipo</label><div class="ms" id="msTipo"><button type="button">Todos</button><div class="pop"></div></div></div>
     <div class="f"><label>Ano (abertura)</label><div class="ms" id="msAno"><button type="button">Todos</button><div class="pop"></div></div></div>
@@ -681,7 +682,7 @@ function applyFilters(){
   }
   idx=out.slice(0,n);idxM=outM.slice(0,nm);
   let nAct=(de!=null?1:0)+(ate!=null?1:0)+(SEG?1:0);for(const k in MS)if(MS[k]&&MS[k].mask)nAct++;
-  $('nAct').textContent=nAct?nAct+' filtro(s) ativo(s)':'';
+  $('nAct').dataset.n=nAct;setNAct();
   kpis();TABS.forEach(k=>dirty[k]=true);render(curTab);
 }
 function kpis(){
@@ -1426,7 +1427,10 @@ addEventListener('resize',()=>{if(curTab==='pn'&&S&&pfPn.value.trim()){clearTime
 // ================= navegação =================
 const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,prev:renderPrev,pn:renderPn,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
-function go(t){curTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
+const OWNQ=['prev','pn'];
+function setNAct(){const e=$('nAct'),n=+(e.dataset.n||0);e.textContent=n?n+' filtro(s) ativo(s)'+(curTab!=='itens'?' da aba Itens de OS':''):''}
+function setFbar(t){const fc=$('fcard'),own=OWNQ.includes(t);fc.classList.toggle('onlyq',t!=='itens'&&!own);fc.classList.toggle('hideall',own);$('qLab').textContent=t==='itens'?'Busca (placa, OS, produto, fornecedor, cliente)':'Placa';q.placeholder=t==='itens'?'ex.: SIW0C82 ou correia':'ex.: SIW0C82';setNAct()}
+function go(t){curTab=t;setFbar(t);document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
 (function(){const tb=$('tabs'),L=$('tabL'),R=$('tabR');
   const upd=()=>{const max=tb.scrollWidth-tb.clientWidth;L.classList.toggle('on',tb.scrollLeft>2);R.classList.toggle('on',tb.scrollLeft<max-2)};
