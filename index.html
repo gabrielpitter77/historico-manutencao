@@ -1434,6 +1434,8 @@ function setNAct(){const e=$('nAct'),n=+(e.dataset.n||0);e.textContent=n?n+' fil
 function setFbar(t){const fc=$('fcard'),own=OWNQ.includes(t);document.body.classList.toggle('notItens',t!=='itens');fc.classList.toggle('onlyq',t!=='itens'&&!own);fc.classList.toggle('hideall',own);$('qLab').textContent=t==='itens'?'Busca (placa, OS, produto, fornecedor, cliente)':'Placa';q.placeholder=t==='itens'?'ex.: SIW0C82 ou correia':'ex.: SIW0C82';setNAct()}
 function go(t){curTab=t;setFbar(t);document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
+// abre direto numa aba pelo link (ex.: …/historico-manutencao/#prev, usado pela Central)
+(function(){const h=location.hash.replace('#','');if(h&&TABS.includes(h))go(h)})();
 (function(){const tb=$('tabs'),L=$('tabL'),R=$('tabR');
   const upd=()=>{const max=tb.scrollWidth-tb.clientWidth;L.classList.toggle('on',tb.scrollLeft>2);R.classList.toggle('on',tb.scrollLeft<max-2)};
   L.onclick=()=>{tb.scrollLeft-=Math.max(200,tb.clientWidth*0.7)};R.onclick=()=>{tb.scrollLeft+=Math.max(200,tb.clientWidth*0.7)};
