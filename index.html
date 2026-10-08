@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" translate="no">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Histórico de Manutenção · LOC Frotas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,6 +46,7 @@ main{padding:16px 24px 40px;max-width:1900px;margin:0 auto}
 .btn.amber{background:var(--amber);color:#111;border-color:var(--amber);font-weight:600}
 #nAct{font-family:var(--mono);font-size:11px;color:var(--amber);white-space:nowrap}
 .filters.onlyq{display:flex;flex-wrap:wrap;gap:10px;align-items:end;padding-top:10px;padding-bottom:10px}.filters.onlyq .f:not(.keep){display:none!important}.filters.onlyq .f.wide{width:280px}.filters.onlyq .f.keep{grid-column:auto!important}.filters.onlyq #tgl{display:none}.filters.hideall{display:none!important}
+body.notItens .kbar,body.notItens #kpis{display:none!important}
 .ms{position:relative}
 .ms>button{text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ms .pop{display:none;position:absolute;z-index:20;top:34px;left:0;width:min(460px,90vw);max-height:360px;overflow:auto;background:var(--panel2);border:1px solid var(--amber);padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -247,11 +249,11 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="f keep" style="display:flex;gap:8px;align-items:center;grid-column:span 2"><button class="btn" id="tgl">▲ Recolher filtros</button><button class="btn" id="clr">Limpar filtros</button><span id="nAct"></span></div>
   </div>
   <div class="tabsw"><button type="button" class="tabarr" id="tabL" title="Ver abas anteriores">‹</button><div class="tabs" id="tabs">
-    <div class="tab on" data-v="itens">Itens de OS</div>
+    <div class="tab on" data-v="itens">Controle de manutenção</div>
+    <div class="tab" data-v="prev">Preventivas</div>
+    <div class="tab" data-v="pn">Pneus</div>
+    <div class="tab" data-v="bat">Bateria</div>
     <div class="tab" data-v="km">Consulta de KM</div>
-    <div class="tab" data-v="bat">Baterias</div>
-    <div class="tab" data-v="prev">Linha de preventiva</div>
-    <div class="tab" data-v="pn">Troca de pneus</div>
     <div class="tab" data-v="alertas">Alertas e qualidade</div>
     <div class="tab" data-v="modelo">Custo por modelo</div>
     <div class="tab" data-v="mensal">Evolução mensal</div>
@@ -351,7 +353,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   <section class="view" id="v-obs">
     <div class="obsgrid">
       <div class="bracket card"><h3>Atualização da base</h3><div class="upd updSlot big" style="display:none"></div><div id="srcInfo" class="srcbox"></div></div>
-      <div class="bracket card"><h3>Como usar a tabela de Itens de OS</h3><ul class="obs">
+      <div class="bracket card"><h3>Como usar a tabela de Controle de manutenção</h3><ul class="obs">
         <li><b>Mover coluna:</b> arraste o título da coluna para o lugar desejado.</li>
         <li><b>Largura:</b> arraste a borda direita do título. <b>Duplo clique</b> na borda ajusta ao conteúdo.</li>
         <li><b>Ordenar:</b> clique no título (de novo inverte a ordem).</li>
@@ -364,7 +366,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
         <li>Os filtros do topo (grupo de despesa, tipo, ano, marca, modelo, cliente, datas) valem para <b>todas as abas</b>. Cada um aceita vários itens.</li>
         <li><b>Recolher filtros</b> e <b>Recolher indicadores</b> liberam espaço na tela.</li>
         <li>Clicar numa barra/linha de modelo, grupo ou cliente adiciona aquele item ao filtro.</li>
-        <li><b>Geral / Leves / Pesados</b> (aba Itens de OS): vale para o painel inteiro. Pesados = grupos Caminhão, Máquina e Implemento; o resto é Leve. O grupo vem do modelo do veículo; modelos novos sem cadastro são classificados pelo nome (ex.: Atego, Axor, VM, Delivery, “6x4”).</li>
+        <li><b>Geral / Leves / Pesados</b> (aba Controle de manutenção): vale para o painel inteiro. Pesados = grupos Caminhão, Máquina e Implemento; o resto é Leve. O grupo vem do modelo do veículo; modelos novos sem cadastro são classificados pelo nome (ex.: Atego, Axor, VM, Delivery, “6x4”).</li>
         <li><b>Consulta de KM:</b> uma linha por placa com o último KM informado nas OS (e a data dessa leitura), modelo, cliente atual, Leve/Pesado e marca. Coluna <b>Maior KM</b>: a maior leitura já informada para a placa; fica âmbar com ⚠ quando o último KM é menor (hodômetro trocado ou KM digitado errado). Respeita os filtros do topo. KM abaixo de 10 (ex.: “1”, valor de preenchimento) ou acima de 2.000.000 é ignorado.</li>
         <li><b>Baterias:</b> uma linha por placa com a última troca (data, KM, produto, valor, fornecedor, OS), dias e KM desde a troca, nº de trocas, última recarga e último teste. “Nunca trocou” = nenhuma troca nas OS da base desde a primeira OS da placa (“Na base desde”). Pesquise ou clique numa placa para ver o histórico completo de trocas, recargas e testes.</li>
         <li><b>Clientes por carro:</b> uma linha por cliente × placa. “Atual = Sim” marca o cliente da OS mais recente da placa (o carro pode ter passado por vários clientes).</li>
@@ -1428,8 +1430,8 @@ addEventListener('resize',()=>{if(curTab==='pn'&&S&&pfPn.value.trim()){clearTime
 const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,prev:renderPrev,pn:renderPn,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
 const OWNQ=['prev','pn'];
-function setNAct(){const e=$('nAct'),n=+(e.dataset.n||0);e.textContent=n?n+' filtro(s) ativo(s)'+(curTab!=='itens'?' da aba Itens de OS':''):''}
-function setFbar(t){const fc=$('fcard'),own=OWNQ.includes(t);fc.classList.toggle('onlyq',t!=='itens'&&!own);fc.classList.toggle('hideall',own);$('qLab').textContent=t==='itens'?'Busca (placa, OS, produto, fornecedor, cliente)':'Placa';q.placeholder=t==='itens'?'ex.: SIW0C82 ou correia':'ex.: SIW0C82';setNAct()}
+function setNAct(){const e=$('nAct'),n=+(e.dataset.n||0);e.textContent=n?n+' filtro(s) ativo(s)'+(curTab!=='itens'?' da aba Controle de manutenção':''):''}
+function setFbar(t){const fc=$('fcard'),own=OWNQ.includes(t);document.body.classList.toggle('notItens',t!=='itens');fc.classList.toggle('onlyq',t!=='itens'&&!own);fc.classList.toggle('hideall',own);$('qLab').textContent=t==='itens'?'Busca (placa, OS, produto, fornecedor, cliente)':'Placa';q.placeholder=t==='itens'?'ex.: SIW0C82 ou correia':'ex.: SIW0C82';setNAct()}
 function go(t){curTab=t;setFbar(t);document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.v));
 (function(){const tb=$('tabs'),L=$('tabL'),R=$('tabR');
