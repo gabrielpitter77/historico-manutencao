@@ -208,7 +208,8 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
 .cmenu .cm-more{font-size:10.5px}
 .batinfo{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6;margin:-4px 0 10px;padding:8px 12px;border-left:3px solid var(--amber);background:var(--panel)}
 .batinfo b{color:var(--text2)}
-#batHist h3{margin:0 0 8px;font-size:14px}
+#batHist h3,#pmHist h3{margin:0 0 8px;font-size:14px}
+#pmHist table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}#pmHist th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:5px 8px;position:sticky;top:0;background:var(--panel)}#pmHist td{padding:5px 8px;border-bottom:1px solid var(--grid)}#pmHist .num{text-align:right}
 #batHist table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
 #batHist th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:5px 8px}
 #batHist td{padding:5px 8px;border-bottom:1px solid #1B2438;color:var(--text2)}
@@ -254,6 +255,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
     <div class="tab" data-v="pn">Pneus</div>
     <div class="tab" data-v="bat">Bateria</div>
     <div class="tab" data-v="km">Consulta de KM</div>
+    <div class="tab" data-v="pm">Preço médio</div>
     <div class="tab" data-v="alertas">Alertas e qualidade</div>
     <div class="tab" data-v="modelo">Custo por modelo</div>
     <div class="tab" data-v="mensal">Evolução mensal</div>
@@ -322,6 +324,13 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   <section class="view" id="v-cli">
     <div class="tbar"><span id="cntCli"></span><span class="note">% recuperado = reembolso ÷ custo total.</span></div>
     <div class="vt" id="vtCli"></div>
+  </section>
+
+  <section class="view" id="v-pm">
+    <div class="tbar"><input class="pf" id="pfPmPl" placeholder="Placa" autocomplete="off" style="width:150px;text-transform:uppercase"><input class="pf" id="pfPmIt" placeholder="Item (ex.: pastilha, oleo 5w30)" autocomplete="off" style="width:300px"><button class="btn" id="pmClr">Limpar</button><span id="cntPm"></span><span class="note">Preço médio = valor total ÷ quantidade (linhas com valor ou quantidade zerada não entram na média). Usa a base inteira, sem os filtros do topo. Clique num item para ver o histórico de preço.</span><div class="sp"><button class="btn amber" id="csvPm">Exportar CSV</button></div></div>
+    <div id="pmTot"></div>
+    <div id="pmHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
+    <div class="vt" id="vtPm"></div>
   </section>
 
   <section class="view" id="v-km">
@@ -580,7 +589,7 @@ let S=null,N=0,F={},Dt={},has={};
 let YEAR,MK,LOW={},CORR=-1,isCorr;
 let idx=new Uint32Array(0),idxI=new Uint32Array(0);
 const dirty={};let curTab='itens';
-const TABS=['itens','km','bat','prev','pn','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
+const TABS=['itens','km','bat','prev','pn','pm','modelo','mensal','gdesp','prod','placas','forn','cli','clicar','alertas','obs'];
 const val=(k,i)=>{const f=S.fields[k];if(!f)return null;const v=f.data[i];if(f.dict)return v<0?null:f.dict[v];if(f.type==='d')return v<0?null:v;if(f.type==='i')return v<0?null:v;return isNaN(v)?null:v};
 const num=(k,i)=>{const v=F[k]?F[k][i]:NaN;return isNaN(v)?0:v};
 
@@ -1426,10 +1435,65 @@ let tPn;pfPn.oninput=()=>{clearTimeout(tPn);tPn=setTimeout(()=>{if(S)drawPn()},2
 pfPn.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(tPn);if(S)drawPn()}};
 addEventListener('resize',()=>{if(curTab==='pn'&&S&&pfPn.value.trim()){clearTimeout(tPn);tPn=setTimeout(drawPn,200)}});
 
+// ---- preço médio por item (filtro de placa e de item; usa a base inteira, sem os filtros do topo)
+let vtPm=null,pmRows=[],pmSel=-1,pmCache=null;const pfPmPl=$('pfPmPl'),pfPmIt=$('pfPmIt');
+function pmMasks(){
+  const tp=pfPmPl.value.toUpperCase().replace(/[^A-Z0-9]/g,''),ti=nrmS(pfPmIt.value).split(/\s+/).filter(Boolean);
+  let mp=null,mi=null;
+  if(tp){mp=new Uint8Array(Dt.placa.length);Dt.placa.forEach((p,j)=>{if(String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,'').includes(tp))mp[j]=1})}
+  if(ti.length){mi=new Uint8Array(Dt.produto.length);Dt.produto.forEach((p,j)=>{const s=nrmS(p);if(ti.every(w=>s.includes(w)))mi[j]=1})}
+  return {mp,mi,tp,ti}}
+function renderPm(){
+  if(!has.produto){$('cntPm').textContent='A base não tem a coluna Produto.';return}
+  const {mp,mi}=pmMasks(),PL=F.placa,PR=F.produto,Q=F.qtd,T=F.total,VU=F.vunit,A=F.abert,m=new Map();
+  let tq=0,tv=0,tqa=0,tva=0,nl=0;
+  for(let i=0;i<N;i++){const pd=PR[i];if(pd<0)continue;if(mi&&!mi[pd])continue;if(mp&&(PL[i]<0||!mp[PL[i]]))continue;
+    const q=Q?(Q[i]||0):0,v=T[i]||0;let r=m.get(pd);
+    if(!r){r={pd,nome:Dt.produto[pd],n:0,q:0,v:0,qa:0,va:0,min:Infinity,max:-Infinity,pl:new Set(),os:new Set(),ud:-1,uu:null,z:0};m.set(pd,r)}
+    r.n++;r.q+=q;r.v+=v;r.pl.add(PL[i]);r.os.add(F.os[i]);nl++;tq+=q;tv+=v;
+    if(q>0&&v>0){const u=v/q;r.qa+=q;r.va+=v;tqa+=q;tva+=v;if(u<r.min)r.min=u;if(u>r.max)r.max=u;if(A[i]>r.ud){r.ud=A[i];r.uu=u}}else r.z++}
+  pmRows=[...m.values()].map(r=>({pd:r.pd,nome:r.nome,n:r.n,q:r.q,v:r.v,pm:r.qa?r.va/r.qa:null,min:isFinite(r.min)?r.min:null,max:isFinite(r.max)?r.max:null,np:r.pl.size,nos:r.os.size,ud:r.ud>=0?r.ud:null,uu:r.uu,z:r.z}))
+    .sort((a,b)=>b.v-a.v);
+  pmCache={nl,tq,tv,pm:tqa?tva/tqa:null,np:pmRows.length};
+  if(!vtPm)vtPm=VT($('vtPm'),[
+    {h:'Item (produto)',v:r=>r.nome,title:1},
+    {h:'Qtd total',num:1,v:r=>r.q,f:cN},
+    {h:'Lançamentos',num:1,v:r=>r.n,f:cI},
+    {h:'OS',num:1,v:r=>r.nos,f:cI},
+    {h:'Placas',num:1,v:r=>r.np,f:cI},
+    {h:'Valor total',num:1,v:r=>r.v,f:cM},
+    {h:'Preço médio',num:1,v:r=>r.pm,f:v=>v==null?'<span style="color:var(--muted)">—</span>':`<b style="color:var(--amber)">${cM(v)}</b>`},
+    {h:'Menor preço',num:1,v:r=>r.min,f:cM},
+    {h:'Maior preço',num:1,v:r=>r.max,f:cM},
+    {h:'Último preço',num:1,v:r=>r.uu,f:cM},
+    {h:'Data do último',date:1,v:r=>r.ud,f:cD},
+    {h:'Lanç. sem valor',num:1,v:r=>r.z,f:v=>v?`<span style="color:var(--muted)" title="Linhas com quantidade ou valor zerado: entram na quantidade, mas não no preço médio">${cI(v)}</span>`:''}
+  ],()=>pmRows,{key:'pm-v1',colFilter:1,click:r=>{pmSel=r.pd;vtPm.draw();pmHist()},sel:r=>r.pd===pmSel,onFilter:()=>{cntPm();pmHist()}});
+  vtPm.refresh();cntPm();pmHist()}
+function cntPm(){if(!vtPm||!pmCache)return;const c=pmCache,f=vtPm.cfActive(),{tp,ti}=pmMasks();
+  const kpi=(l,v,s)=>`<div class="pk"><div class="pkl">${l}</div><div class="pkv">${v}</div>${s?`<div class="pks">${s}</div>`:''}</div>`;
+  $('pmTot').innerHTML=(tp||ti.length)?`<div class="pkw">${kpi('Itens encontrados',fmtI.format(c.np),fmtI.format(c.nl)+' lançamentos')}${kpi('Quantidade total',cN(c.tq),'')}${kpi('Valor total',cM(c.tv),'')}${kpi('Preço médio do filtro',c.pm!=null?cM(c.pm):'—','valor ÷ quantidade, juntando todos os itens da lista')}</div>`:'';
+  $('cntPm').innerHTML=fmtI.format(vtPm.count())+' itens'+(f?' · <span class="warn">'+f+' filtro(s) de coluna</span>':'')}
+function pmHist(){
+  const box=$('pmHist');if(!vtPm){box.style.display='none';return}
+  const rows=vtPm.rows();const pd=pmSel>=0&&rows.some(r=>r.pd===pmSel)?pmSel:(rows.length===1?rows[0].pd:-1);
+  if(pd<0){box.style.display='none';return}
+  const r=pmRows.find(x=>x.pd===pd),{mp}=pmMasks(),L=[];
+  for(let i=0;i<N;i++){if(F.produto[i]!==pd)continue;if(mp&&(F.placa[i]<0||!mp[F.placa[i]]))continue;L.push(i)}
+  L.sort((a,b)=>(F.abert[b]-F.abert[a])||(F.os[b]-F.os[a]));
+  const nm=(f,i)=>F[f]&&F[f][i]>=0?Dt[f][F[f][i]]:'';const MX=300;
+  const tr=L.slice(0,MX).map(i=>{const q=F.qtd?(F.qtd[i]||0):0,v=F.total[i]||0,u=q>0&&v>0?v/q:null;return `<tr><td>${cD(F.abert[i])}</td><td class="warn">${esc(nm('placa',i))}</td><td class="num">${F.os[i]}</td><td>${esc(nm('modelo',i))}</td><td>${esc(nm('forn',i))}</td><td class="num">${cN(q)}</td><td class="num">${u!=null?cM(u):'<span style="color:var(--muted)">—</span>'}</td><td class="num">${cM(v)}</td><td class="num" style="color:var(--text2)">${u!=null&&r.pm?(u>r.pm?'+':'')+fmtN.format((u/r.pm-1)*100)+'%':''}</td></tr>`}).join('');
+  box.innerHTML=`<h3>Histórico de preço · <span class="warn">${esc(r.nome)}</span></h3><div class="note" style="margin-bottom:8px">Preço médio <b>${r.pm!=null?cM(r.pm):'—'}</b> · menor ${cM(r.min)} · maior ${cM(r.max)} · ${cN(r.q)} unidade(s) em ${fmtI.format(r.n)} lançamento(s), ${fmtI.format(r.np)} placa(s).${L.length>MX?' Mostrando os '+MX+' mais recentes.':''}</div><div class="pbox" style="max-height:340px"><table><thead><tr><th>Data</th><th>Placa</th><th class="num">OS</th><th>Modelo</th><th>Fornecedor</th><th class="num">Qtd</th><th class="num">Preço unit.</th><th class="num">Valor total</th><th class="num">vs. médio</th></tr></thead><tbody>${tr}</tbody></table></div>`;box.style.display=''}
+let tPm;[pfPmPl,pfPmIt].forEach(el=>el.oninput=()=>{clearTimeout(tPm);tPm=setTimeout(()=>{pmSel=-1;if(S)renderPm()},300)});
+$('pmClr').onclick=()=>{pfPmPl.value='';pfPmIt.value='';pmSel=-1;if(vtPm)vtPm.clearCF();if(S)renderPm()};
+$('csvPm').onclick=()=>{if(!vtPm)return;const C=vtPm.cols();const lines=[C.map(c=>c.h).join(';')];
+  for(const r of vtPm.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v).replace('.',',');v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='preco_medio.csv';a.click()};
+
 // ================= navegação =================
-const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,prev:renderPrev,pn:renderPn,obs:()=>updBadge()};
+const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,prev:renderPrev,pn:renderPn,pm:renderPm,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
-const OWNQ=['prev','pn'];
+const OWNQ=['prev','pn','pm'];
 function setNAct(){const e=$('nAct'),n=+(e.dataset.n||0);e.textContent=n?n+' filtro(s) ativo(s)'+(curTab!=='itens'?' da aba Controle de manutenção':''):''}
 function setFbar(t){const fc=$('fcard'),own=OWNQ.includes(t);document.body.classList.toggle('notItens',t!=='itens');fc.classList.toggle('onlyq',t!=='itens'&&!own);fc.classList.toggle('hideall',own);$('qLab').textContent=t==='itens'?'Busca (placa, OS, produto, fornecedor, cliente)':'Placa';q.placeholder=t==='itens'?'ex.: SIW0C82 ou correia':'ex.: SIW0C82';setNAct()}
 function go(t){curTab=t;setFbar(t);document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===t));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+t));render(t)}
