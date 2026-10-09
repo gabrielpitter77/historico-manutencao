@@ -210,7 +210,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
 .batinfo{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6;margin:-4px 0 10px;padding:8px 12px;border-left:3px solid var(--amber);background:var(--panel)}
 .batinfo b{color:var(--text2)}
 #batHist h3,#pmHist h3{margin:0 0 8px;font-size:14px}
-#pmHist table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}#pmHist th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:5px 8px;position:sticky;top:0;background:var(--panel)}#pmHist td{padding:5px 8px;border-bottom:1px solid var(--grid)}#pmHist .num{text-align:right}
+#pmHist .pmscroll{max-height:360px;overflow:auto;border:1px solid var(--line)}#pmHist table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}#pmHist th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:5px 8px;position:sticky;top:0;background:var(--panel)}#pmHist td{padding:5px 8px;border-bottom:1px solid var(--grid)}#pmHist .num{text-align:right}
 #batHist table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
 #batHist th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:5px 8px}
 #batHist td{padding:5px 8px;border-bottom:1px solid #1B2438;color:var(--text2)}
@@ -330,8 +330,8 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   <section class="view" id="v-pm">
     <div class="tbar"><input class="pf" id="pfPmPl" placeholder="Placa" autocomplete="off" style="width:150px;text-transform:uppercase"><div class="ms" id="msPmMo" style="width:260px"><button type="button">Modelo: todos</button><div class="pop"></div></div><div class="ms" id="msPmIt" style="width:300px"><button type="button">Item: todos</button><div class="pop"></div></div><button class="btn" id="pmClr">Limpar</button><span id="cntPm"></span><span class="note">Preço médio = valor total ÷ quantidade (linhas com valor ou quantidade zerada não entram na média). Usa a base inteira, sem os filtros do topo. Clique num item para ver o histórico de preço.</span><div class="sp"><button class="btn amber" id="csvPm">Exportar CSV</button></div></div>
     <div id="pmTot"></div>
+    <div class="vt" id="vtPm" style="margin-bottom:10px"></div>
     <div id="pmHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
-    <div class="vt" id="vtPm"></div>
   </section>
 
   <section class="view" id="v-km">
@@ -1504,7 +1504,8 @@ function renderPm(){
     {h:'Lanç. sem valor',num:1,v:r=>r.z,f:v=>v?`<span style="color:var(--muted)" title="Linhas com quantidade ou valor zerado: entram na quantidade, mas não no preço médio">${cI(v)}</span>`:''}
   ],()=>pmRows,{key:'pm-v1',colFilter:1,click:r=>{pmSel=r.pd;vtPm.draw();pmHist()},sel:r=>r.pd===pmSel,onFilter:()=>{cntPm();pmHist()}});
   vtPm.refresh();cntPm();pmHist()}
-function cntPm(){if(!vtPm||!pmCache)return;const c=pmCache,f=vtPm.cfActive(),{tp,ti,tm}=pmMasks();
+function pmFit(){const el=$('vtPm');if(!vtPm)return;const n=vtPm.count();el.style.height=Math.round(Math.min(innerHeight*0.55,40+26*Math.max(1,n)+12))+'px';vtPm.draw()}
+function cntPm(){if(!vtPm||!pmCache)return;pmFit();const c=pmCache,f=vtPm.cfActive(),{tp,ti,tm}=pmMasks();
   const kpi=(l,v,s)=>`<div class="pk"><div class="pkl">${l}</div><div class="pkv">${v}</div>${s?`<div class="pks">${s}</div>`:''}</div>`;
   $('pmTot').innerHTML=(tp||ti.length||tm.length)?`<div class="pkw">${kpi('Itens encontrados',fmtI.format(c.np),fmtI.format(c.nl)+' lançamentos')}${kpi('Quantidade total',cN(c.tq),'')}${kpi('Valor total',cM(c.tv),'')}${kpi('Preço médio do filtro',c.pm!=null?cM(c.pm):'—','valor ÷ quantidade, juntando todos os itens da lista')}</div>`:'';
   $('cntPm').innerHTML=fmtI.format(vtPm.count())+' itens'+(f?' · <span class="warn">'+f+' filtro(s) de coluna</span>':'')}
@@ -1515,9 +1516,9 @@ function pmHist(){
   const r=pmRows.find(x=>x.pd===pd),{mp,mm}=pmMasks(),L=[];
   for(let i=0;i<N;i++){if(F.produto[i]!==pd)continue;if(mp&&(F.placa[i]<0||!mp[F.placa[i]]))continue;if(mm&&(!F.modelo||F.modelo[i]<0||!mm[F.modelo[i]]))continue;L.push(i)}
   L.sort((a,b)=>(F.abert[b]-F.abert[a])||(F.os[b]-F.os[a]));
-  const nm=(f,i)=>F[f]&&F[f][i]>=0?Dt[f][F[f][i]]:'';const MX=300;
+  const nm=(f,i)=>F[f]&&F[f][i]>=0?Dt[f][F[f][i]]:'';const MX=3000;
   const tr=L.slice(0,MX).map(i=>{const q=F.qtd?(F.qtd[i]||0):0,v=F.total[i]||0,u=q>0&&v>0?v/q:null;return `<tr><td>${cD(F.abert[i])}</td><td class="warn">${esc(nm('placa',i))}</td><td class="num">${F.os[i]}</td><td>${esc(nm('modelo',i))}</td><td>${esc(nm('forn',i))}</td><td class="num">${cN(q)}</td><td class="num">${u!=null?cM(u):'<span style="color:var(--muted)">—</span>'}</td><td class="num">${cM(v)}</td><td class="num" style="color:var(--text2)">${u!=null&&r.pm?(u>r.pm?'+':'')+fmtN.format((u/r.pm-1)*100)+'%':''}</td></tr>`}).join('');
-  box.innerHTML=`<h3>Histórico de preço · <span class="warn">${esc(r.nome)}</span></h3><div class="note" style="margin-bottom:8px">Preço médio <b>${r.pm!=null?cM(r.pm):'—'}</b> · menor ${cM(r.min)} · maior ${cM(r.max)} · ${cN(r.q)} unidade(s) em ${fmtI.format(r.n)} lançamento(s), ${fmtI.format(r.np)} placa(s).${L.length>MX?' Mostrando os '+MX+' mais recentes.':''}</div><div class="pbox" style="max-height:340px"><table><thead><tr><th>Data</th><th>Placa</th><th class="num">OS</th><th>Modelo</th><th>Fornecedor</th><th class="num">Qtd</th><th class="num">Preço unit.</th><th class="num">Valor total</th><th class="num">vs. médio</th></tr></thead><tbody>${tr}</tbody></table></div>`;box.style.display=''}
+  box.innerHTML=`<h3>Histórico de preço · <span class="warn">${esc(r.nome)}</span></h3><div class="note" style="margin-bottom:8px">Preço médio <b>${r.pm!=null?cM(r.pm):'—'}</b> · menor ${cM(r.min)} · maior ${cM(r.max)} · ${cN(r.q)} unidade(s) em ${fmtI.format(r.n)} lançamento(s), ${fmtI.format(r.np)} placa(s).${L.length>MX?' Mostrando os '+MX+' mais recentes.':''}</div><div class="pmscroll"><table><thead><tr><th>Data</th><th>Placa</th><th class="num">OS</th><th>Modelo</th><th>Fornecedor</th><th class="num">Qtd</th><th class="num">Preço unit.</th><th class="num">Valor total</th><th class="num">vs. médio</th></tr></thead><tbody>${tr}</tbody></table></div>`;box.style.display=''}
 let tPm;[pfPmPl].forEach(el=>el.oninput=()=>{clearTimeout(tPm);tPm=setTimeout(()=>{pmSel=-1;if(S)renderPm()},300)});
 $('pmClr').onclick=()=>{pfPmPl.value='';pmIt=new Set();pmItLabel();pmMo=new Set();pmMoLabel();pmSel=-1;if(vtPm)vtPm.clearCF();if(S)renderPm()};
 $('csvPm').onclick=()=>{if(!vtPm)return;const C=vtPm.cols();const lines=[C.map(c=>c.h).join(';')];
