@@ -3,6 +3,7 @@
 <head>
 <meta name="author" content="Gabriel Pitter">
 <meta charset="utf-8">
+<script>try{if(localStorage.getItem("loc-theme")==="light")document.documentElement.classList.add("light")}catch(e){}</script>
 <meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Histórico de Manutenção · LOC Frotas</title>
@@ -70,6 +71,47 @@ body.notItens .kbar,body.notItens #kpis{display:none!important}
 *::-webkit-scrollbar-thumb:hover{background:#F5A623}
 *::-webkit-scrollbar-corner{background:transparent}
 :root{color-scheme:dark}
+/* ===== tema claro (botão no topo; escolha fica salva neste computador) ===== */
+html.light{--bg:#F3F5F9;--panel:#FFFFFF;--panel2:#EEF2F8;--line:#C9D2E0;--grid:#E2E7EF;--navy:#1F3864;--navy2:#2B4A80;
+  --amber:#B86E00;--amber-dim:rgba(184,110,0,.12);--text:#1A2233;--text2:#3A4558;--muted:#667287;--red:#C2303A;--green:#17834F;--s1:#C47F14;--s2:#3F6FD0;color-scheme:light}
+html.light body{background:var(--bg);color:var(--text)}
+html.light header{background:linear-gradient(90deg,#DCE5F3 0%,var(--bg) 70%)}
+html.light .btn{background:#E6ECF5;border-color:#B8C4D8;color:#1A2233}
+html.light .btn:hover{background:#D9E1EE}
+html.light .btn.amber{background:#F5A623;border-color:#E0951A;color:#111}
+html.light .seg button.on{background:#F5A623;color:#111}
+html.light .vt thead th{color:#fff}
+html.light .vt td{border-bottom-color:var(--grid)}
+html.light #batHist td{border-bottom-color:var(--grid)}
+html.light #tip,html.light #prevPin,html.light #pnPin{background:#FFFFFF;color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.18)}
+html.light #overlay{background:rgba(243,245,249,.92)}
+html.light #adm{background:rgba(243,245,249,.85)}
+html.light #login{background:radial-gradient(ellipse at top,#DCE5F3 0%,var(--bg) 60%)}
+html.light .upd.ok{color:#126B42}html.light .upd.mid{color:#8A5A00}html.light .upd.old{color:#A3262D}
+html.light .tag.r,html.light #batHist .tag.r{color:#2B4A80}
+html.light *{scrollbar-color:#B8C4D8 transparent}
+html.light *::-webkit-scrollbar-thumb{background:#B8C4D8}
+html.light .tabarr:hover{color:#fff}
+
+.themesw{position:relative;width:66px;height:32px;border-radius:999px;border:1px solid #2B4A80;cursor:pointer;padding:0;flex:none;
+  background:linear-gradient(135deg,#0E1830 0%,#1F3864 100%);box-shadow:inset 0 1px 3px rgba(0,0,0,.45);transition:background .35s,border-color .35s}
+.themesw .ts-knob{position:absolute;top:2px;left:36px;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#5B8CFF 0%,#2446B8 100%);color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.45),0 0 10px rgba(91,140,255,.55);transition:left .35s cubic-bezier(.4,1.4,.6,1),background .35s,box-shadow .35s}
+.themesw .ts-i{position:absolute;display:flex;transition:opacity .25s,transform .35s}
+.themesw .ts-sun{opacity:0;transform:rotate(-90deg) scale(.6)}
+.themesw .ts-stars{position:absolute;left:9px;top:8px;color:#C9D6FF;opacity:.9;transition:opacity .25s}
+.themesw .ts-rays{position:absolute;right:9px;top:7px;color:#fff;opacity:0;display:flex;transition:opacity .25s}
+.themesw:hover{border-color:#5B8CFF}
+.themesw:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+html.light .themesw{background:linear-gradient(135deg,#FFC15E 0%,#F5821F 100%);border-color:#E0791A;box-shadow:inset 0 1px 3px rgba(0,0,0,.18)}
+html.light .themesw .ts-knob{left:2px;background:#fff;color:#F5821F;box-shadow:0 2px 6px rgba(0,0,0,.25),0 0 10px rgba(255,193,94,.7)}
+html.light .themesw .ts-moon{opacity:0;transform:rotate(90deg) scale(.6)}
+html.light .themesw .ts-sun{opacity:1;transform:none}
+html.light .themesw .ts-stars{opacity:0}
+html.light .themesw .ts-rays{opacity:.55}
+html.light .themesw:hover{border-color:#B86E00}
+
+
 .tabarr{flex:none;width:34px;background:var(--panel2);border:1px solid var(--line);border-bottom:none;color:var(--amber);font-size:20px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0}
 .tabarr:hover{background:var(--navy);color:#fff}
 .tabarr.on{display:flex}
@@ -230,7 +272,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
 <header>
   <div class="brand">LOC <b>FROTAS</b></div>
   <h1>Histórico de Manutenção · Custos e Despesas</h1>
-  <div class="src"><a class="btn" href="https://gabrielpitter77.github.io/painel-frota-parada-2/" style="text-decoration:none;display:inline-flex;align-items:center">← Central</a><button class="btn amber adm" id="btnLoad">Carregar base</button><button class="btn amber adm" id="btnPub" style="display:none">Gerar base.enc para publicar</button><button class="btn" id="btnOut">Sair</button><input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden></div>
+  <div class="src"><button type="button" class="themesw" id="btnTheme" role="switch" aria-checked="false" aria-label="Tema claro ou escuro"><svg class="ts-stars" viewBox="0 0 30 20" width="22" height="15" aria-hidden="true"><path d="M6 3l.9 2.1L9 6l-2.1.9L6 9l-.9-2.1L3 6l2.1-.9z M17 10l.6 1.4 1.4.6-1.4.6L17 14l-.6-1.4L15 12l1.4-.6z M24 3l.5 1 1 .5-1 .5-.5 1-.5-1-1-.5 1-.5z" fill="currentColor"/></svg><span class="ts-rays"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></g></svg></span><span class="ts-knob"><span class="ts-i ts-moon"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z" fill="currentColor"/></svg></span><span class="ts-i ts-sun"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></g></svg></span></span></button><a class="btn" href="https://gabrielpitter77.github.io/painel-frota-parada-2/" style="text-decoration:none;display:inline-flex;align-items:center">← Central</a><button class="btn amber adm" id="btnLoad">Carregar base</button><button class="btn amber adm" id="btnPub" style="display:none">Gerar base.enc para publicar</button><button class="btn" id="btnOut">Sair</button><input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden></div>
 </header>
 <div id="localBadge">⚠ Você está vendo uma base LOCAL, ainda não publicada. Os analistas continuam vendo a base anterior até você subir o novo base.enc no GitHub.</div>
 <main>
@@ -1532,6 +1574,10 @@ $('csvPm').onclick=()=>{if(!vtPm)return;const C=vtPm.cols();const lines=[C.map(c
   for(const r of vtPm.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v).replace('.',',');v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='preco_medio.csv';a.click()};
 
+
+// ---- tema claro / escuro
+(function(){const b=$('btnTheme');if(!b)return;const lbl=()=>{const l=document.documentElement.classList.contains('light');b.setAttribute('aria-checked',l?'true':'false');b.title=l?'Tema claro (clique para escuro)':'Tema escuro (clique para claro)'};lbl();
+  b.onclick=()=>{const l=document.documentElement.classList.toggle('light');try{localStorage.setItem('loc-theme',l?'light':'dark')}catch(e){}lbl();if(S&&typeof curTab!=='undefined'){dirty[curTab]=true;render(curTab)}}})();
 // ================= navegação =================
 const R={itens:renderItens,modelo:renderModelo,mensal:renderMensal,gdesp:renderGdesp,prod:renderProd,placas:renderPlacas,forn:renderForn,cli:renderCli,alertas:renderAlertas,clicar:renderCliCar,km:renderKm,bat:renderBat,prev:renderPrev,pn:renderPn,pm:renderPm,obs:()=>updBadge()};
 function render(t){if(!S)return;if(dirty[t]){dirty[t]=false;R[t]()}}
