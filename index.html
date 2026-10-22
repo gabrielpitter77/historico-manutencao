@@ -394,7 +394,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   </section>
 
   <section class="view" id="v-prev">
-    <div class="tbar"><input class="pf" id="pfPrev" list="dlPrev" placeholder="Digite a placa…" autocomplete="off" style="width:220px;text-transform:uppercase"><datalist id="dlPrev"></datalist><span id="cntPrev"></span><span class="note">Preventiva = OS com item do grupo 01.02.02 (Mão de Obra Revisões Programadas) ou produto “Revisão …”, ou, se esqueceram o item de revisão, OS que trocou óleo de motor + filtro de óleo + outro filtro (ar, combustível, ar-condicionado) — essas aparecem com ◌. Mostra todas as OS da placa, sem os filtros do topo, para não esconder nenhum item.</span></div>
+    <div class="tbar"><input class="pf" id="pfPrev" list="dlPrev" placeholder="Digite a placa…" autocomplete="off" style="width:220px;text-transform:uppercase"><datalist id="dlPrev"></datalist><span id="cntPrev"></span><span class="note">Preventiva = OS com produto “Revisão …”, ou, se esqueceram o item de revisão, OS que trocou óleo de motor + filtro de óleo + outro filtro (ar, combustível, ar-condicionado) — essas aparecem com ◌. O grupo 01.02.02 sozinho não conta (é usado também para freio, transporte, alinhamento). Mostra todas as OS da placa, sem os filtros do topo, para não esconder nenhum item.</span></div>
     <div id="prevBox"></div>
   </section>
 
@@ -1308,7 +1308,7 @@ function prevMasks(){if(PRVM&&PRVM.np===Dt.produto.length&&PRVM.ng===(Dt.gdesp||
   PRVM={np:Dt.produto.length,ng:(Dt.gdesp||[]).length,p,g,rk,kit};return PRVM}
 function renderPrev(){
   if(!has.produto){$('prevBox').innerHTML='<div class="note">A base não tem a coluna Produto.</div>';return}
-  const dl=$('dlPrev');if(!dl.dataset.n||+dl.dataset.n!==Dt.placa.length){const M=prevMasks(),seen=new Uint8Array(Dt.placa.length),kb=new Map();for(let i=0;i<N;i++){const pd=F.produto[i],gd=F.gdesp?F.gdesp[i]:-1;if((pd>=0&&M.p[pd])||(gd>=0&&M.g[gd]))seen[F.placa[i]]=1;else if(pd>=0&&M.kit[pd]){const o=F.os[i];const b=(kb.get(o)||0)|M.kit[pd];kb.set(o,b);if(b===7)seen[F.placa[i]]=1}}
+  const dl=$('dlPrev');if(!dl.dataset.n||+dl.dataset.n!==Dt.placa.length){const M=prevMasks(),seen=new Uint8Array(Dt.placa.length),kb=new Map();for(let i=0;i<N;i++){const pd=F.produto[i],gd=F.gdesp?F.gdesp[i]:-1;if(pd>=0&&M.p[pd])seen[F.placa[i]]=1;else{const bit=(pd>=0?M.kit[pd]:0)|(gd>=0&&M.g[gd]?8:0);if(bit){const o=F.os[i];const b=(kb.get(o)||0)|bit;kb.set(o,b);if((b&7)===7||((b&8)&&(b&3)===3))seen[F.placa[i]]=1}}}
     let h='';for(let k=0;k<seen.length;k++)if(seen[k])h+=`<option value="${esc(Dt.placa[k])}">`;dl.innerHTML=h;dl.dataset.n=Dt.placa.length}
   drawPrev()}
 function prevData(pk){
@@ -1317,11 +1317,12 @@ function prevData(pk){
     if(okK(k)&&(a>lastKmD||(a===lastKmD&&k>lastKm))){lastKm=k;lastKmD=a}if(a>lastD){lastD=a;li=i}
     let o=os.get(F.os[i]);if(!o){o={os:F.os[i],a,km:null,prev:false,kit:0,rk:0,it:new Map(),tot:0,forn:''};os.set(F.os[i],o)}
     if(a>=0&&(o.a<0||a<o.a))o.a=a;if(okK(k)&&(o.km==null||k>o.km))o.km=k;
-    const pd=F.produto[i],gd=F.gdesp?F.gdesp[i]:-1;if((pd>=0&&M.p[pd])||(gd>=0&&M.g[gd]))o.prev=true;if(pd>=0)o.kit|=M.kit[pd];if(pd>=0&&M.rk[pd]>o.rk)o.rk=M.rk[pd];
+    const pd=F.produto[i],gd=F.gdesp?F.gdesp[i]:-1;if(pd>=0&&M.p[pd])o.prev=true;if(gd>=0&&M.g[gd])o.grp=true;if(pd>=0)o.kit|=M.kit[pd];if(pd>=0&&M.rk[pd]>o.rk)o.rk=M.rk[pd];
     o.it.set(i,{nm:pd>=0?Dt.produto[pd]:'(sem produto)',q:F.qtd?(F.qtd[i]||0):0,vu:F.vunit?F.vunit[i]:null,v:F.total[i]||0,re:F.reemb?(F.reemb[i]||0):0,g:gd>=0?String(Dt.gdesp[gd]).replace(/^[\d.]+\s*-\s*/,''):'',pv:(pd>=0&&M.p[pd])||(gd>=0&&M.g[gd])});o.tot+=F.total[i]||0;
     if(!o.forn&&F.forn&&F.forn[i]>=0)o.forn=Dt.forn[F.forn[i]]}
   // regra 2: sem item de revisão, mas trocou óleo de motor + filtro de óleo + outro filtro na mesma OS
-  for(const o of os.values())if(!o.prev&&o.kit===7){o.prev=true;o.inf=true}
+  // grupo 01.02.02 sozinho não basta (usam para freio, transporte, alinhamento…): só conta com óleo de motor + filtro de óleo
+  for(const o of os.values())if(!o.prev&&(o.kit===7||(o.grp&&(o.kit&3)===3))){o.prev=true;o.inf=true}
   // a mesma revisão às vezes é lançada em 2 OS (peças numa, mão de obra noutra): junta OS a até 3 dias e 500 km de outra preventiva
   {const A=[...os.values()].filter(o=>o.prev).sort((a,b)=>(a.inf-b.inf)||(a.a-b.a)||(a.os-b.os));
    for(const o of A){if(o.gone)continue;for(const q of A){if(q===o||q.gone||!q.inf)continue;
