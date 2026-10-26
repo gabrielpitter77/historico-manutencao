@@ -376,7 +376,7 @@ ul.obs code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;bor
   </section>
 
   <section class="view" id="v-pm">
-    <div class="tbar"><input class="pf" id="pfPmPl" placeholder="Placa" autocomplete="off" style="width:150px;text-transform:uppercase"><div class="ms" id="msPmMo" style="width:260px"><button type="button">Modelo: todos</button><div class="pop"></div></div><div class="ms" id="msPmIt" style="width:300px"><button type="button">Item: todos</button><div class="pop"></div></div><div class="ms" id="msPmAno" style="width:150px"><button type="button">Ano: todos</button><div class="pop" style="width:220px"></div></div><button class="btn" id="pmClr">Limpar</button><span id="cntPm"></span><span class="note">Mediana = preço típico (metade das unidades foi comprada abaixo dele); faixa normal = 80% das unidades. Preço médio = valor total ÷ quantidade (linhas zeradas não entram). Usa a base inteira, sem os filtros do topo; o filtro de ano usa a data de abertura da OS. Clique num item para ver o histórico de preço.</span><div class="sp"><button class="btn amber" id="csvPm">Exportar CSV</button></div></div>
+    <div class="tbar"><input class="pf" id="pfPmPl" placeholder="Placa" autocomplete="off" style="width:150px;text-transform:uppercase"><div class="ms" id="msPmMo" style="width:260px"><button type="button">Modelo: todos</button><div class="pop"></div></div><div class="ms" id="msPmIt" style="width:300px"><button type="button">Item: todos</button><div class="pop"></div></div><div class="ms" id="msPmAno" style="width:150px"><button type="button">Ano: todos</button><div class="pop" style="width:220px"></div></div><div class="ms" id="msPmUf" style="width:130px;display:none"><button type="button">UF: todas</button><div class="pop" style="width:260px"></div></div><div class="ms" id="msPmCi" style="width:220px;display:none"><button type="button">Cidade: todas</button><div class="pop" style="width:340px"></div></div><button class="btn" id="pmClr">Limpar</button><span id="cntPm"></span><span class="note">Mediana = preço típico (metade das unidades foi comprada abaixo dele); faixa normal = 80% das unidades. Preço médio = valor total ÷ quantidade (linhas zeradas não entram). Usa a base inteira, sem os filtros do topo; o filtro de ano usa a data de abertura da OS; UF e cidade são de onde fica o fornecedor (cadastro de fornecedores). Clique num item para ver o histórico de preço.</span><div class="sp"><button class="btn amber" id="csvPm">Exportar CSV</button></div></div>
     <div id="pmTot"></div>
     <div class="vt" id="vtPm" style="margin-bottom:10px"></div>
     <div id="pmHist" class="bracket card" style="display:none;margin-bottom:10px"></div>
@@ -1523,6 +1523,47 @@ pfPn.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(tPn);if(S)drawPn()}};
 addEventListener('resize',()=>{if(curTab==='pn'&&S&&pfPn.value.trim()){clearTimeout(tPn);tPn=setTimeout(drawPn,200)}});
 
 // ---- preço médio por item (filtro de placa e de item; usa a base inteira, sem os filtros do topo)
+// UF / cidade do fornecedor: vem do cadastro de fornecedores (forn-map.enc, criptografado com a mesma senha da base)
+let FLOC=null,pmUf=new Set(),pmCi=new Set();
+const nrmF=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+async function loadFloc(){try{const r=await fetch('forn-map.enc?v='+Date.now(),{cache:'no-store'});if(!r.ok)return;const b=new Uint8Array(await r.arrayBuffer());
+  for(let k=0;k<16;k++)if(b[k]!==PAY.salt[k]){console.warn('forn-map.enc: senha diferente da base');return}
+  const j=JSON.parse(new TextDecoder().decode(await gunzip(await decB(KEY,b.slice(16,28),b.slice(28)))));FLOC={m:j.m,v:j.v,src:j.src,n:-1};
+  if(S){dirty.pm=true;if(curTab==='pm')render('pm')}}catch(e){console.warn('forn-map.enc',e)}}
+const UFX='?',ufNm=u=>u===UFX?'Indefinida':u;
+function flocIdx(){if(!FLOC||!Dt.forn)return null;if(FLOC.n===Dt.forn.length)return FLOC;
+  const uf=new Int16Array(Dt.forn.length),ci=new Int32Array(Dt.forn.length),UFS=[],CIS=[],um=new Map(),cm=new Map();
+  const gu=u=>{if(!um.has(u)){um.set(u,UFS.length);UFS.push(u)}return um.get(u)},gc=(c,u)=>{const k=c+'/'+u;if(!cm.has(k)){cm.set(k,CIS.length);CIS.push({c,u,k})}return cm.get(k)};
+  Dt.forn.forEach((f,j)=>{const e=FLOC.m[nrmF(f)];if(!e){uf[j]=gu(UFX);ci[j]=gc('(fornecedor sem cadastro)',UFX)}else if(!e[1]){uf[j]=gu(UFX);ci[j]=gc('(mesmo nome em vários estados)',UFX)}else{uf[j]=gu(e[1]);ci[j]=gc(e[0]||'(várias cidades)',e[1])}});
+  Object.assign(FLOC,{n:Dt.forn.length,uf,ci,UFS,CIS});return FLOC}
+const ciNm=x=>x.u===UFX?x.c:x.c+' / '+x.u;
+function pmUfLabel(){const b=$('msPmUf').querySelector('button');const a=[...pmUf].map(ufNm).sort();b.textContent=!a.length?'UF: todas':a.length<=3?'UF: '+a.join(', '):a.length+' UFs';b.title=a.join(', ');b.style.borderColor=a.length?'var(--amber)':''}
+function pmCiLabel(){const b=$('msPmCi').querySelector('button'),L=flocIdx();const a=L?[...pmCi].map(k=>{const x=L.CIS.find(y=>y.k===k);return x?ciNm(x):k}):[];b.textContent=!a.length?'Cidade: todas':a.length===1?a[0]:a.length+' cidades';b.title=a.join('\n');b.style.borderColor=a.length?'var(--amber)':''}
+function pmLocCounts(L){const cu=new Uint32Array(L.UFS.length),cc=new Uint32Array(L.CIS.length),FN=F.forn;for(let i=0;i<N;i++){if(F.produto[i]<0)continue;const f=FN?FN[i]:-1;if(f<0)continue;cu[L.uf[f]]++;cc[L.ci[f]]++}return {cu,cc}}
+function pmLocBuild(){const eu=$('msPmUf'),ec=$('msPmCi'),L=flocIdx();if(!L){eu.style.display=ec.style.display='none';return}eu.style.display=ec.style.display='';
+  if(+eu.dataset.n===N&&+eu.dataset.f===L.n)return;eu.dataset.n=N;eu.dataset.f=L.n;const {cu,cc}=pmLocCounts(L);
+  const go=()=>{clearTimeout(tPm);tPm=setTimeout(()=>{pmSel=-1;if(S)renderPm()},250)};
+  // UF
+  {const pop=eu.querySelector('.pop'),us=L.UFS.map((u,k)=>[u,cu[k]]).filter(x=>x[1]).sort((a,b)=>(a[0]===UFX)-(b[0]===UFX)||b[1]-a[1]);
+   pmUf=new Set([...pmUf].filter(u=>us.some(x=>x[0]===u)));
+   pop.innerHTML='<div class="acts"><button class="btn" data-a="none">Todas as UFs</button></div><div class="lst">'+us.map(([u,n])=>`<label title="${u===UFX?'Fornecedor sem cadastro, ou o mesmo nome existe em mais de um estado':''}"><input type="checkbox" value="${esc(u)}">${esc(ufNm(u))} <span style="color:var(--muted);margin-left:auto">${fmtI.format(n)} lanç.</span></label>`).join('')+'</div>';
+   const btn=eu.querySelector('button'),boxes=[...pop.querySelectorAll('input[type=checkbox]')];
+   const apply=()=>{pmUf=new Set(boxes.filter(b=>b.checked).map(b=>b.value));if(pmUf.size)pmCi=new Set([...pmCi].filter(k=>{const x=L.CIS.find(y=>y.k===k);return x&&pmUf.has(x.u)}));pmUfLabel();pmCiLabel();go()};
+   btn.onclick=e=>{e.stopPropagation();const was=eu.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was){boxes.forEach(b=>b.checked=pmUf.has(b.value));eu.classList.add('open')}};
+   pop.onclick=e=>e.stopPropagation();pop.querySelector('.acts .btn').onclick=()=>{boxes.forEach(x=>x.checked=false);apply()};boxes.forEach(b=>b.onchange=apply)}
+  // cidade (lista segue as UFs marcadas)
+  {const pop=ec.querySelector('.pop');pmCi=new Set([...pmCi].filter(k=>L.CIS.some(y=>y.k===k)));
+   pop.innerHTML='<input type="text" class="pf" placeholder="Procurar cidade… (ex.: maraba)"><div class="acts"><button class="btn" data-a="vis">Marcar as da busca</button><button class="btn" data-a="none">Limpar</button></div><div class="note pci-n" style="margin-bottom:4px"></div><div class="lst"></div>';
+   const btn=ec.querySelector('button'),srch=pop.querySelector('input[type=text]'),lst=pop.querySelector('.lst'),note=pop.querySelector('.pci-n');let shown=[];
+   const all=L.CIS.map((x,k)=>({x,k,n:cc[k],s:nrmS(x.c+' '+x.u)})).filter(o=>o.n).sort((a,b)=>(a.x.u===UFX)-(b.x.u===UFX)||a.x.c.localeCompare(b.x.c,'pt-BR')||a.x.u.localeCompare(b.x.u));
+   const paint=()=>{const w=nrmS(srch.value).split(/\s+/).filter(Boolean);shown=all.filter(o=>(!pmUf.size||pmUf.has(o.x.u))&&w.every(t=>o.s.includes(t)));
+     lst.innerHTML=shown.map(o=>`<label><input type="checkbox" value="${esc(o.x.k)}" ${pmCi.has(o.x.k)?'checked':''}>${esc(ciNm(o.x))} <span style="color:var(--muted);margin-left:auto">${fmtI.format(o.n)}</span></label>`).join('')||'<div class="note" style="padding:6px">Nenhuma cidade encontrada</div>';
+     note.textContent=fmtI.format(shown.length)+' cidade(s)'+(pmUf.size?' nas UFs marcadas':'')+'. Número à direita = lançamentos na base.'};
+   btn.onclick=e=>{e.stopPropagation();const was=ec.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was){paint();ec.classList.add('open');srch.focus()}};
+   pop.onclick=e=>e.stopPropagation();let tq;srch.oninput=()=>{clearTimeout(tq);tq=setTimeout(paint,150)};
+   lst.onchange=e=>{const b=e.target.closest('input[type=checkbox]');if(!b)return;if(b.checked)pmCi.add(b.value);else pmCi.delete(b.value);pmCiLabel();go()};
+   pop.querySelectorAll('.acts .btn').forEach(b=>b.onclick=()=>{if(b.dataset.a==='none')pmCi=new Set();else shown.forEach(o=>pmCi.add(o.x.k));paint();pmCiLabel();go()})}
+  pmUfLabel();pmCiLabel()}
 let vtPm=null,pmRows=[],pmSel=-1,pmCache=null;const pfPmPl=$('pfPmPl');let pmMo=new Set(),pmIt=new Set(),PMIT=null,pmYr=new Set();
 function pmMasks(){
   const tp=pfPmPl.value.toUpperCase().replace(/[^A-Z0-9]/g,''),ti=[...pmIt],tm=[...pmMo],ty=[...pmYr],yr=ty.length?pmYr:null;
@@ -1530,7 +1571,11 @@ function pmMasks(){
   if(tm.length&&Dt.modelo){mm=new Uint8Array(Dt.modelo.length);tm.forEach(j=>mm[j]=1)}
   if(tp){mp=new Uint8Array(Dt.placa.length);Dt.placa.forEach((p,j)=>{if(String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,'').includes(tp))mp[j]=1})}
   if(ti.length){mi=new Uint8Array(Dt.produto.length);ti.forEach(j=>mi[j]=1)}
-  return {mp,mi,mm,tp,ti,tm,ty,yr}}
+  const L=flocIdx();let mu=null,mc=null;
+  if(L&&pmUf.size){mu=new Uint8Array(L.UFS.length);L.UFS.forEach((u,k)=>{if(pmUf.has(u))mu[k]=1})}
+  if(L&&pmCi.size){mc=new Uint8Array(L.CIS.length);L.CIS.forEach((x,k)=>{if(pmCi.has(x.k))mc[k]=1})}
+  return {mp,mi,mm,tp,ti,tm,ty,yr,L,mu,mc,tu:[...pmUf],tc:[...pmCi]}}
+function pmLocOk(i,L,mu,mc){const f=F.forn?F.forn[i]:-1;if(mu&&(f<0||!mu[L.uf[f]]))return false;if(mc&&(f<0||!mc[L.ci[f]]))return false;return true}
 // filtro de ano (data de abertura da OS), seleção múltipla
 function pmYrLabel(){const b=$('msPmAno').querySelector('button');const a=[...pmYr].sort();b.textContent=!a.length?'Ano: todos':a.length<=3?'Ano: '+a.join(', '):a.length+' anos';b.title=a.join(', ');b.style.borderColor=a.length?'var(--amber)':''}
 function pmYrBuild(){const el=$('msPmAno'),pop=el.querySelector('.pop');if(+el.dataset.n===N)return;el.dataset.n=N;
@@ -1581,10 +1626,10 @@ function pmQuant(a){const n=a.length/2;if(!n)return {med:null,p10:null,p90:null}
   const med=tot%2?at((tot-1)/2):(at(tot/2-1)+at(tot/2))/2;return {med,p10:at(Math.floor((tot-1)*0.1)),p90:at(Math.floor((tot-1)*0.9))}}
 function renderPm(){
   if(!has.produto){$('cntPm').textContent='A base não tem a coluna Produto.';return}
-  pmMoBuild();pmItBuild();pmYrBuild();
-  const {mp,mi,mm,yr}=pmMasks(),MO=F.modelo,PL=F.placa,PR=F.produto,Q=F.qtd,T=F.total,VU=F.vunit,A=F.abert,m=new Map();
+  pmMoBuild();pmItBuild();pmYrBuild();pmLocBuild();
+  const {mp,mi,mm,yr,L:LC,mu,mc}=pmMasks(),MO=F.modelo,PL=F.placa,PR=F.produto,Q=F.qtd,T=F.total,VU=F.vunit,A=F.abert,m=new Map();
   let tq=0,tv=0,tqa=0,tva=0,nl=0;const allU=[];
-  for(let i=0;i<N;i++){const pd=PR[i];if(pd<0)continue;if(mi&&!mi[pd])continue;if(mp&&(PL[i]<0||!mp[PL[i]]))continue;if(mm&&(!MO||MO[i]<0||!mm[MO[i]]))continue;if(yr&&!yr.has(YEAR[i]))continue;
+  for(let i=0;i<N;i++){const pd=PR[i];if(pd<0)continue;if(mi&&!mi[pd])continue;if(mp&&(PL[i]<0||!mp[PL[i]]))continue;if(mm&&(!MO||MO[i]<0||!mm[MO[i]]))continue;if(yr&&!yr.has(YEAR[i]))continue;if((mu||mc)&&!pmLocOk(i,LC,mu,mc))continue;
     const q=Q?(Q[i]||0):0,v=T[i]||0;let r=m.get(pd);
     if(!r){r={pd,nome:Dt.produto[pd],n:0,q:0,v:0,qa:0,va:0,us:[],min:Infinity,max:-Infinity,pl:new Set(),os:new Set(),ud:-1,uu:null,z:0};m.set(pd,r)}
     r.n++;r.q+=q;r.v+=v;r.pl.add(PL[i]);r.os.add(F.os[i]);nl++;tq+=q;tv+=v;
@@ -1610,22 +1655,22 @@ function renderPm(){
   ],()=>pmRows,{key:'pm-v2',colFilter:1,click:r=>{pmSel=r.pd;vtPm.draw();pmHist()},sel:r=>r.pd===pmSel,onFilter:()=>{cntPm();pmHist()}});
   vtPm.refresh();cntPm();pmHist()}
 function pmFit(){const el=$('vtPm');if(!vtPm)return;const n=vtPm.count();el.style.height=Math.round(Math.min(innerHeight*0.55,40+26*Math.max(1,n)+12))+'px';vtPm.draw()}
-function cntPm(){if(!vtPm||!pmCache)return;pmFit();const c=pmCache,f=vtPm.cfActive(),{tp,ti,tm,ty}=pmMasks();
+function cntPm(){if(!vtPm||!pmCache)return;pmFit();const c=pmCache,f=vtPm.cfActive(),{tp,ti,tm,ty,tu,tc}=pmMasks();
   const kpi=(l,v,s)=>`<div class="pk"><div class="pkl">${l}</div><div class="pkv">${v}</div>${s?`<div class="pks">${s}</div>`:''}</div>`;
-  $('pmTot').innerHTML=(tp||ti.length||tm.length||ty.length)?`<div class="pkw">${kpi('Itens encontrados',fmtI.format(c.np),fmtI.format(c.nl)+' lançamentos')}${kpi('Quantidade total',cN(c.tq),'')}${kpi('Valor total',cM(c.tv),'')}${kpi('Mediana do filtro',c.med!=null?cM(c.med):'—',c.p10!=null?'faixa normal '+cM(c.p10)+' a '+cM(c.p90):'')}${kpi('Preço médio do filtro',c.pm!=null?cM(c.pm):'—','valor ÷ quantidade, juntando todos os itens da lista')}</div>`:'';
+  $('pmTot').innerHTML=(tp||ti.length||tm.length||ty.length||tu.length||tc.length)?`<div class="pkw">${kpi('Itens encontrados',fmtI.format(c.np),fmtI.format(c.nl)+' lançamentos')}${kpi('Quantidade total',cN(c.tq),'')}${kpi('Valor total',cM(c.tv),'')}${kpi('Mediana do filtro',c.med!=null?cM(c.med):'—',c.p10!=null?'faixa normal '+cM(c.p10)+' a '+cM(c.p90):'')}${kpi('Preço médio do filtro',c.pm!=null?cM(c.pm):'—','valor ÷ quantidade, juntando todos os itens da lista')}</div>`:'';
   $('cntPm').innerHTML=fmtI.format(vtPm.count())+' itens'+(f?' · <span class="warn">'+f+' filtro(s) de coluna</span>':'')}
 function pmHist(){
   const box=$('pmHist');if(!vtPm){box.style.display='none';return}
   const rows=vtPm.rows();const pd=pmSel>=0&&rows.some(r=>r.pd===pmSel)?pmSel:(rows.length===1?rows[0].pd:-1);
   if(pd<0){box.style.display='none';return}
-  const r=pmRows.find(x=>x.pd===pd),{mp,mm,yr,ty}=pmMasks(),L=[];
-  for(let i=0;i<N;i++){if(F.produto[i]!==pd)continue;if(mp&&(F.placa[i]<0||!mp[F.placa[i]]))continue;if(mm&&(!F.modelo||F.modelo[i]<0||!mm[F.modelo[i]]))continue;if(yr&&!yr.has(YEAR[i]))continue;L.push(i)}
+  const r=pmRows.find(x=>x.pd===pd),{mp,mm,yr,ty,L:LC,mu,mc,tu}=pmMasks(),L=[];
+  for(let i=0;i<N;i++){if(F.produto[i]!==pd)continue;if(mp&&(F.placa[i]<0||!mp[F.placa[i]]))continue;if(mm&&(!F.modelo||F.modelo[i]<0||!mm[F.modelo[i]]))continue;if(yr&&!yr.has(YEAR[i]))continue;if((mu||mc)&&!pmLocOk(i,LC,mu,mc))continue;L.push(i)}
   L.sort((a,b)=>(F.abert[b]-F.abert[a])||(F.os[b]-F.os[a]));
   const nm=(f,i)=>F[f]&&F[f][i]>=0?Dt[f][F[f][i]]:'';const MX=3000;
-  const tr=L.slice(0,MX).map(i=>{const q=F.qtd?(F.qtd[i]||0):0,v=F.total[i]||0,u=q>0&&v>0?v/q:null;return `<tr><td>${cD(F.abert[i])}</td><td class="warn">${esc(nm('placa',i))}</td><td class="num">${F.os[i]}</td><td>${esc(nm('modelo',i))}</td><td>${esc(nm('forn',i))}</td><td class="num">${cN(q)}</td><td class="num">${u!=null?cM(u):'<span style="color:var(--muted)">—</span>'}</td><td class="num">${cM(v)}</td><td class="num" style="color:${u!=null&&r.p90!=null&&u>r.p90?'var(--red)':u!=null&&r.p10!=null&&u<r.p10?'var(--green)':'var(--text2)'}" title="${u!=null&&r.p90!=null&&u>r.p90?'Acima da faixa normal':u!=null&&r.p10!=null&&u<r.p10?'Abaixo da faixa normal':''}">${u!=null&&r.med?(u>r.med?'+':'')+fmtN.format((u/r.med-1)*100)+'%':''}${u!=null&&r.p90!=null&&u>r.p90?' ▲':u!=null&&r.p10!=null&&u<r.p10?' ▼':''}</td></tr>`}).join('');
-  box.innerHTML=`<h3>Histórico de preço · <span class="warn">${esc(r.nome)}</span>${ty.length?' · '+ty.sort().join(', '):''}</h3><div class="note" style="margin-bottom:8px">Mediana <b>${r.med!=null?cM(r.med):'—'}</b> · faixa normal ${cM(r.p10)} a ${cM(r.p90)} · preço médio ${r.pm!=null?cM(r.pm):'—'} · menor ${cM(r.min)} · maior ${cM(r.max)} · ${cN(r.q)} unidade(s) em ${fmtI.format(r.n)} lançamento(s), ${fmtI.format(r.np)} placa(s).${L.length>MX?' Mostrando os '+MX+' mais recentes.':''}</div><div class="pmscroll"><table><thead><tr><th>Data</th><th>Placa</th><th class="num">OS</th><th>Modelo</th><th>Fornecedor</th><th class="num">Qtd</th><th class="num">Preço unit.</th><th class="num">Valor total</th><th class="num" title="Diferença para a mediana. ▲ vermelho = acima da faixa normal; ▼ verde = abaixo">vs. mediana</th></tr></thead><tbody>${tr}</tbody></table></div>`;box.style.display=''}
+  const tr=L.slice(0,MX).map(i=>{const q=F.qtd?(F.qtd[i]||0):0,v=F.total[i]||0,u=q>0&&v>0?v/q:null;return `<tr><td>${cD(F.abert[i])}</td><td class="warn">${esc(nm('placa',i))}</td><td class="num">${F.os[i]}</td><td>${esc(nm('modelo',i))}</td><td>${esc(nm('forn',i))}</td>${LC?`<td>${F.forn[i]>=0?esc(ciNm(LC.CIS[LC.ci[F.forn[i]]])):''}</td>`:''}<td class="num">${cN(q)}</td><td class="num">${u!=null?cM(u):'<span style="color:var(--muted)">—</span>'}</td><td class="num">${cM(v)}</td><td class="num" style="color:${u!=null&&r.p90!=null&&u>r.p90?'var(--red)':u!=null&&r.p10!=null&&u<r.p10?'var(--green)':'var(--text2)'}" title="${u!=null&&r.p90!=null&&u>r.p90?'Acima da faixa normal':u!=null&&r.p10!=null&&u<r.p10?'Abaixo da faixa normal':''}">${u!=null&&r.med?(u>r.med?'+':'')+fmtN.format((u/r.med-1)*100)+'%':''}${u!=null&&r.p90!=null&&u>r.p90?' ▲':u!=null&&r.p10!=null&&u<r.p10?' ▼':''}</td></tr>`}).join('');
+  box.innerHTML=`<h3>Histórico de preço · <span class="warn">${esc(r.nome)}</span>${ty.length?' · '+ty.sort().join(', '):''}${tu.length?' · '+tu.map(ufNm).sort().join(', '):''}</h3><div class="note" style="margin-bottom:8px">Mediana <b>${r.med!=null?cM(r.med):'—'}</b> · faixa normal ${cM(r.p10)} a ${cM(r.p90)} · preço médio ${r.pm!=null?cM(r.pm):'—'} · menor ${cM(r.min)} · maior ${cM(r.max)} · ${cN(r.q)} unidade(s) em ${fmtI.format(r.n)} lançamento(s), ${fmtI.format(r.np)} placa(s).${L.length>MX?' Mostrando os '+MX+' mais recentes.':''}</div><div class="pmscroll"><table><thead><tr><th>Data</th><th>Placa</th><th class="num">OS</th><th>Modelo</th><th>Fornecedor</th>${LC?'<th>Cidade / UF do fornecedor</th>':''}<th class="num">Qtd</th><th class="num">Preço unit.</th><th class="num">Valor total</th><th class="num" title="Diferença para a mediana. ▲ vermelho = acima da faixa normal; ▼ verde = abaixo">vs. mediana</th></tr></thead><tbody>${tr}</tbody></table></div>`;box.style.display=''}
 let tPm;[pfPmPl].forEach(el=>el.oninput=()=>{clearTimeout(tPm);tPm=setTimeout(()=>{pmSel=-1;if(S)renderPm()},300)});
-$('pmClr').onclick=()=>{pfPmPl.value='';pmIt=new Set();pmItLabel();pmMo=new Set();pmMoLabel();pmYr=new Set();pmYrLabel();pmSel=-1;if(vtPm)vtPm.clearCF();if(S)renderPm()};
+$('pmClr').onclick=()=>{pfPmPl.value='';pmIt=new Set();pmItLabel();pmMo=new Set();pmMoLabel();pmYr=new Set();pmYrLabel();pmUf=new Set();pmCi=new Set();if(FLOC){pmUfLabel();pmCiLabel()}pmSel=-1;if(vtPm)vtPm.clearCF();if(S)renderPm()};
 $('csvPm').onclick=()=>{if(!vtPm)return;const C=vtPm.cols();const lines=[C.map(c=>c.h).join(';')];
   for(const r of vtPm.rows())lines.push(C.map(c=>{let v=c.v(r);if(v==null)return'';if(c.date)v=dStr(v);else if(typeof v==='number')v=String(v).replace('.',',');v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='preco_medio.csv';a.click()};
@@ -1757,7 +1802,7 @@ async function enter(raw){
   try{
     let st=LOCCORE.unpack(await gunzip(raw));raw=null;
     IDB.del('base');IDB.del('base_enc'); // limpa cópias locais de versões antigas
-    setStore(st);overlayOff();
+    setStore(st);overlayOff();loadFloc();
   }catch(e){overlay('Erro ao carregar: '+esc(e.message||e),true)}
 }
 $('btnOut').onclick=async()=>{try{sessionStorage.removeItem('loc-adm')}catch(e){}await IDB.del('lkey');location.reload()};
