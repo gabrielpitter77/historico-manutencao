@@ -145,6 +145,11 @@ html.light .themesw .ts-bgmoon{opacity:0}
 .vt td{padding:0 8px;height:26px;white-space:nowrap;border-bottom:1px solid #1B2438;max-width:300px;overflow:hidden;text-overflow:ellipsis;color:var(--text2)}
 .vt td.num{text-align:right;color:var(--text)}
 .vt tbody tr:hover td{background:var(--amber-dim)}
+/* cruz de foco: coluna sob o mouse também acende; a célula do cruzamento fica em destaque */
+.vt tbody td.hc{background:var(--amber-dim)}
+.vt tbody tr:hover td.hc{background:rgba(245,166,35,.30);box-shadow:inset 0 0 0 1px var(--amber);color:var(--text)}
+html.light .vt tbody tr:hover td.hc{background:rgba(184,110,0,.32)}
+.vt thead th.hc{color:var(--amber);box-shadow:inset 0 -2px 0 var(--amber)}
 .vt tbody tr.click{cursor:pointer}
 .vt tbody tr.sel td{background:rgba(79,127,219,.18)}
 .vt tbody tr.msel td{background:rgba(245,166,35,.20)}
@@ -763,7 +768,7 @@ function VT(el,cols,getRows,opt){
   try{const s=JSON.parse(localStorage.getItem(LS)||'null');if(s&&Array.isArray(s.order)){const k=s.order.filter(h=>byH.has(h));order=k.concat(H.filter(h=>!k.includes(h)));if(Array.isArray(s.hidden))hidden=new Set(s.hidden.filter(h=>byH.has(h)));if(s.widths&&typeof s.widths==='object')widths=s.widths}}catch(e){}
   const save=()=>{try{localStorage.setItem(LS,JSON.stringify({order,hidden:[...hidden],widths}))}catch(e){}};
   const fixed=()=>Object.keys(widths).length>0,wOf=c=>widths[c.h]||(c.num?120:160);
-  let vis=[];const calc=()=>{vis=order.filter(h=>!hidden.has(h)).map(h=>byH.get(h))};calc();
+  let vis=[],hcol=-1;const calc=()=>{vis=order.filter(h=>!hidden.has(h)).map(h=>byH.get(h))};calc();
   let base=[];const cf={};// cf[h]={txt,vals:Set|null,pred}
   const MS=!opt.click;let msel=new Set(),anchor=-1,bar=null;
   if(MS){bar=document.createElement('div');bar.className='vtsel';el.insertAdjacentElement('beforebegin',bar);
@@ -848,7 +853,7 @@ function VT(el,cols,getRows,opt){
     m.style.left=x+'px';m.style.top=y+'px';setTimeout(()=>q.focus(),20);openedAt=Date.now();
   }
 
-  function setHead(){
+  function setHead(){hcol=-1;
     const fx=fixed(),tw=fx?vis.reduce((a,c)=>a+wOf(c),0):0;
     el.innerHTML=`<table class="${fx?'fixed':''}" style="${fx?'width:'+tw+'px':''}">${fx?'<colgroup>'+vis.map(c=>`<col style="width:${wOf(c)}px">`).join('')+'</colgroup>':''}<thead><tr>${vis.map((c,j)=>`<th data-j="${j}" draggable="true" title="Arraste para mover · clique para ordenar${opt.colFilter?' · ▾ para filtrar':''} · arraste a borda direita para ajustar a largura" class="${c.num?'num':''}${opt.colFilter?' hf':''}">${esc(c.h)}${sortC===c?'<span class="ar"> '+(dir>0?'▲':'▼')+'</span>':''}${opt.colFilter?`<button type="button" class="fb${activeOf(c.h)?' on':''}" data-h="${esc(c.h)}" draggable="false" title="Filtrar esta coluna">▾</button>`:''}<span class="rz" draggable="false" title="Arraste para ajustar a largura · duplo clique ajusta ao conteúdo"></span></th>`).join('')}</tr></thead><tbody></tbody></table>`;
     let from=null;const ths=[...el.querySelectorAll('thead tr:first-child th')];const clr=()=>ths.forEach(x=>x.classList.remove('dragging','dropL','dropR'));
@@ -875,7 +880,7 @@ function VT(el,cols,getRows,opt){
   }
   function sortRows(){if(!sortC)return;const c=sortC;const arr=Array.from(rows);const kv=new Map();arr.forEach(r=>kv.set(r,c.v(r)));arr.sort((a,b)=>{const x=kv.get(a),y=kv.get(b);if(x==null||x==='')return 1;if(y==null||y==='')return -1;return (x<y?-1:x>y?1:0)*dir});rows=arr}
   function draw(){const tb=el.querySelector('tbody');if(!tb)return;const n=rows.length;const st=el.scrollTop;const nv=Math.ceil((el.clientHeight||600)/RH)+12;const s=Math.max(0,Math.floor(st/RH)-6),e=Math.min(n,s+nv);
-    let h=`<tr style="height:${s*RH}px"></tr>`;for(let r=s;r<e;r++){const row=rows[r];h+=`<tr data-r="${r}" class="${opt.click?'click':MS?'ms':''}${opt.sel&&opt.sel(row)?' sel':''}${MS&&msel.has(row)?' msel':''}">`+vis.map(c=>{const v=c.v(row);const f=c.f?c.f(v,row):v==null?'':esc(v);const cls=(c.num?'num':'')+(c.neg&&v<0?' neg':'');return `<td class="${cls}"${c.title?` title="${esc(v??'')}"`:''}>${f}</td>`}).join('')+'</tr>'}
+    let h=`<tr style="height:${s*RH}px"></tr>`;for(let r=s;r<e;r++){const row=rows[r];h+=`<tr data-r="${r}" class="${opt.click?'click':MS?'ms':''}${opt.sel&&opt.sel(row)?' sel':''}${MS&&msel.has(row)?' msel':''}">`+vis.map((c,j)=>{const v=c.v(row);const f=c.f?c.f(v,row):v==null?'':esc(v);const cls=(c.num?'num':'')+(c.neg&&v<0?' neg':'')+(j===hcol?' hc':'');return `<td class="${cls}"${c.title?` title="${esc(v??'')}"`:''}>${f}</td>`}).join('')+'</tr>'}
     h+=`<tr style="height:${(n-e)*RH}px"></tr>`;tb.innerHTML=h}
   el.onscroll=()=>{if(Date.now()-openedAt>400)closeMenus();requestAnimationFrame(draw)};
   el.onclick=e=>{const tr=e.target.closest('tr[data-r]');if(!tr)return;const ix=+tr.dataset.r;if(opt.click){opt.click(rows[ix]);return}if(!MS)return;
@@ -884,6 +889,11 @@ function VT(el,cols,getRows,opt){
     else if(e.ctrlKey||e.metaKey){if(msel.has(row))msel.delete(row);else msel.add(row);anchor=ix}
     else{if(msel.size===1&&msel.has(row))msel.clear();else{msel.clear();msel.add(row)}anchor=ix}
     draw();paintBar()};
+  // cruz de foco (linha + coluna sob o mouse)
+  const setHC=j=>{if(j===hcol)return;hcol=j;el.querySelectorAll('.hc').forEach(x=>x.classList.remove('hc'));if(j<0)return;
+    el.querySelectorAll('tbody tr[data-r]').forEach(tr=>{const td=tr.cells[j];if(td)td.classList.add('hc')});const th=el.querySelector('thead th[data-j="'+j+'"]');if(th)th.classList.add('hc')};
+  el.addEventListener('mouseover',e=>{const td=e.target.closest('tbody td');if(td&&td.parentElement.dataset.r!=null)setHC(td.cellIndex)});
+  el.addEventListener('mouseleave',()=>setHC(-1));
   if(MS)el.onmousedown=e=>{if(e.shiftKey&&e.target.closest('tr[data-r]'))e.preventDefault()};
   setHead();
   return {refresh(){base=getRows();for(const h in cf)compile(h);applyCF()},draw,clearSel:()=>{if(msel.size)clearSel()},count:()=>rows.length,rows:()=>rows,
