@@ -727,9 +727,11 @@ function makeMS(el,k,items,pl,maint){
   return o;
 }
 const q=$('q');let idxM=new Uint32Array(0);
+// buscar "pneu" também traz os pneus lançados só com a medida (ex.: 205 60 R16 DUNLOP)
+const pneuQ=t=>/^pneus?$/.test(t)&&has.produto?pnMasks().m:null;
 function applyFilters(){
-  const t=q.value.trim().toLowerCase();const hit={};let osHit=null;
-  if(t){for(const k of ['placa','produto','forn','cliente','crazao'])if(LOW[k]){const s=new Uint8Array(LOW[k].length);let any=false;LOW[k].forEach((v,j)=>{if(v.includes(t)){s[j]=1;any=true}});hit[k]=any?s:null}if(/^\d+$/.test(t))osHit=+t}
+  const t=q.value.trim().toLowerCase();const hit={};let osHit=null;const PQ=pneuQ(t);
+  if(t){for(const k of ['placa','produto','forn','cliente','crazao'])if(LOW[k]){const s=new Uint8Array(LOW[k].length);let any=false;LOW[k].forEach((v,j)=>{if(v.includes(t)||(k==='produto'&&PQ&&PQ[j]===1)){s[j]=1;any=true}});hit[k]=any?s:null}if(/^\d+$/.test(t))osHit=+t}
   const masks=[],mm=[];for(const k in MS){const m=MS[k];if(!m||!m.mask||k==='ano')continue;(k===($('mGrp').value)?mm:masks).push([F[k],m.mask])}
   const yM=MS.ano&&MS.ano.mask;
   const de=$('fDe').value?Math.floor(Date.parse($('fDe').value)/864e5):null,ate=$('fAte').value?Math.floor(Date.parse($('fAte').value)/864e5):null;
@@ -937,7 +939,7 @@ function buildColPick(){
   pop.onclick=e=>e.stopPropagation();
 }
 const pfI=$('pfItens');
-function prodFilterItems(){const t=pfI.value.trim().toLowerCase();if(!t||!has.produto){idxI=idx;return}const L=Dt.produto.map(v=>String(v||'').toLowerCase());const h=new Uint8Array(L.length);L.forEach((v,k)=>{if(v.includes(t))h[k]=1});idxI=idx.filter(i=>h[F.produto[i]])}
+function prodFilterItems(){const t=pfI.value.trim().toLowerCase();if(!t||!has.produto){idxI=idx;return}const L=Dt.produto.map(v=>String(v||'').toLowerCase());const h=new Uint8Array(L.length);const PQ=pneuQ(t);L.forEach((v,k)=>{if(v.includes(t)||(PQ&&PQ[k]===1))h[k]=1});idxI=idx.filter(i=>h[F.produto[i]])}
 function updCntItens(){if(!vtI)return;const n=vtI.count(),cfn=vtI.cfActive();$('cntItens').innerHTML=fmtI.format(n)+' itens'+(n!==idx.length?' (de '+fmtI.format(idx.length)+')':'')+(cfn?` · <span class="warn">${cfn} filtro(s) de coluna</span>`:'')}
 function renderItens(){prodFilterItems();vtI.refresh();updCntItens()}
 
@@ -1069,7 +1071,7 @@ const pfP=$('pfProd');
 function renderProd(){
   const t=pfP.value.trim().toLowerCase();const L=Dt.produto.map(v=>String(v||'').toLowerCase());
   const m=new Map();const T=F.total,Q=F.qtd,V=F.vunit,P=F.produto;
-  for(const i of idx){const p=P[i];if(t&&(p<0||!L[p].includes(t)))continue;let a=m.get(p);if(!a){a={k:p,itens:0,tot:0,q:0,vq:0,qv:0,pr:[],os:new Set(),pl:new Set(),fo:new Set()};m.set(p,a)}
+  const PQ=pneuQ(t);for(const i of idx){const p=P[i];if(t&&(p<0||!(L[p].includes(t)||(PQ&&PQ[p]===1))))continue;let a=m.get(p);if(!a){a={k:p,itens:0,tot:0,q:0,vq:0,qv:0,pr:[],os:new Set(),pl:new Set(),fo:new Set()};m.set(p,a)}
     const v=T[i]||0,qq=Q?(Q[i]||0):0,vu=V?V[i]:NaN;a.itens++;a.tot+=v;a.q+=qq;if(isFinite(vu)&&vu>0&&qq>0){a.vq+=vu*qq;a.qv+=qq;a.pr.push(vu)}a.os.add(F.os[i]);a.pl.add(F.placa[i]);if(F.forn)a.fo.add(F.forn[i])}
   const rows=[...m.values()];let all=0;rows.forEach(a=>{a.name=a.k<0?'(sem produto)':Dt.produto[a.k];all+=a.tot;a.pm=a.qv?a.vq/a.qv:null;const s=Float64Array.from(a.pr).sort();a.pr=null;a.p10=qtl(s,.1);a.med=qtl(s,.5);a.p90=qtl(s,.9);a.var=a.p10&&a.p90?a.p90/a.p10:null});
   rows.sort((a,b)=>b.tot-a.tot);let acc=0;rows.forEach(a=>{acc+=a.tot;a.cum=all?acc/all:0;a.share=all?a.tot/all:0});pRows=rows;
@@ -1432,13 +1434,14 @@ addEventListener('resize',()=>{if(curTab==='prev'&&S&&pfPrev.value.trim()){clear
 // ---- troca de pneus (por placa) — mesma lógica da linha de preventiva, só com pneus
 // Troca = OS com compra de pneu (produto "Pneu ..." ou só a medida, ex.: 265/65R17). Também entram as OS só de alinhamento/balanceamento (marcadas em azul).
 const PN_AB=/alinha|balanc|geometria|cambagem|caster/;
-const PN_PECA=/^pneu(s|i)?(\b|(?=\d))|^\d{3}\s*[\/ ]\s*\d{2}\s*[\/ ]?\s*z?r?\s*\d{2}\b|\b\d{3}\s*\/\s*\d{2}\s*z?r\s?\d{2}|^(camara de ar|recapag|recauchut|ressolag|banda de rodagem)/;
+const PN_PECA=/^pneu(s|i)?(\b|(?=\d))|^\d{2,3}\s*[\/ ]\s*\d{2}\s*[\/ ]?\s*z?r?\s*\d{2}\b|^carcaca \d{3}|\b\d{3}\s*\/\s*\d{2}\s*z?r\s?\d{2}|^(camara de ar|recapag|recauchut|ressolag|banda de rodagem)/;
 const PN_NAO=/roda\b|calota|\baro\b|parachoque|para-choque|painel|farol|sensor|proxy|porta|capo|tampa|lanterna|radar|camera|banco|retrovisor|carroceria|\bbau\b|pneumat/;
 const PN_SERV=/montag|desmont|reparo|conserto|remend|calibr|rodizio|bico|valvula|vulcaniz|troca|enchimento|nitrog|servico|mao de obra|balanc|alinha/;
 let PNM=null,pnOpen=new Set(),pnPk=-1,pnShow=0;const pfPn=$('pfPn');
 function pnMasks(){if(PNM&&PNM.np===Dt.produto.length)return PNM;
   const m=new Uint8Array(Dt.produto.length);
-  Dt.produto.forEach((v,j)=>{const s=nrmS(v);if(PN_PECA.test(s)&&!PN_SERV.test(s)&&!PN_NAO.test(s))m[j]=1;
+  // "PNEU ... IMPORTADO" / "PNEU ... ARO 17": nome que começa com pneu não passa pela lista de exclusão (importado contém "porta")
+  Dt.produto.forEach((v,j)=>{const s=nrmS(v);if(PN_PECA.test(s)&&!PN_SERV.test(s)&&(/^pneus? /.test(s)||!PN_NAO.test(s)))m[j]=1;
     else if((/\bpneus?\b/.test(s)||/^(alinhamento|balanceamento|balanciamento|geometria|cambagem|caster|rodizio)/.test(s))&&!PN_NAO.test(s))m[j]=2});
   Dt.produto.forEach((v,j)=>{if(m[j]===2&&PN_AB.test(nrmS(v)))m[j]=3});
   PNM={np:Dt.produto.length,m};return PNM}
