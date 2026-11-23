@@ -1539,7 +1539,7 @@ addEventListener('resize',()=>{if(curTab==='pn'&&S&&pfPn.value.trim()){clearTime
 // UF / cidade do fornecedor: vem do cadastro de fornecedores (forn-map.enc, criptografado com a mesma senha da base)
 let FLOC=null,pmUf=new Set(),pmCi=new Set();
 const nrmF=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
-async function loadFloc(){try{const r=await fetch('forn-map.enc?v='+Date.now(),{cache:'no-store'});if(!r.ok)return;const b=new Uint8Array(await r.arrayBuffer());
+async function loadFloc(){try{const b=new Uint8Array(await ghGet('historico-manutencao','forn-map.enc'));
   for(let k=0;k<16;k++)if(b[k]!==PAY.salt[k]){console.warn('forn-map.enc: senha diferente da base');return}
   const j=JSON.parse(new TextDecoder().decode(await gunzip(await decB(KEY,b.slice(16,28),b.slice(28)))));FLOC={m:j.m,v:j.v,src:j.src,n:-1};
   if(S){dirty.pm=true;if(curTab==='pm')render('pm')}}catch(e){console.warn('forn-map.enc',e)}}
@@ -1792,8 +1792,41 @@ function sumAll(){let t=0;const T=F.total;for(let i=0;i<N;i++)t+=T[i]||0;return 
 // ================= login + criptografia =================
 if(/[?&]admin=1/.test(location.search))document.body.classList.add('admin');
 let KEY=null,PAY=null,PENDING=null;
-const payP=fetch('base.enc?v='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('base.enc não encontrado ('+r.status+')');return r.arrayBuffer()}).then(ab=>{const b=new Uint8Array(ab);PAY={salt:b.slice(0,16),iv:b.slice(16,28),ct:b.slice(28)};return PAY});
-payP.catch(()=>{});
+// ===== Arquivos de dados: entregues pelo jsDelivr na versão exata do GitHub (rápido e sempre atualizado);
+// o próprio GitHub Pages fica como reserva. Motivo: o GitHub Pages passou a entregar arquivos grandes muito devagar.
+const GH_USER='gabrielpitter77';
+async function ghSha(repo,file){const k='ghsha:'+repo+'/'+file;
+  try{const c=JSON.parse(localStorage.getItem(k)||'null');if(c&&c.s&&Date.now()-c.t<300000)return c.s}catch(e){}
+  try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),6000);
+    const r=await fetch('https://api.github.com/repos/'+GH_USER+'/'+repo+'/commits?per_page=1&path='+encodeURIComponent(file),{signal:ac.signal,cache:'no-store'});clearTimeout(tm);
+    if(!r.ok)return null;const j=await r.json(),s=j&&j[0]&&j[0].sha;
+    if(s){try{localStorage.setItem(k,JSON.stringify({s:s,t:Date.now()}))}catch(e){}}return s||null}catch(e){return null}}
+async function ghTry(u,ms,cache){const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),ms);
+  try{const r=await fetch(u,{signal:ac.signal,cache:cache||'no-store'});if(!r.ok){const er=new Error('HTTP '+r.status);er.status=r.status;throw er}const ab=await r.arrayBuffer();clearTimeout(tm);return ab}
+  catch(e){clearTimeout(tm);throw e}}
+async function ghGet(repo,file){const sha=await ghSha(repo,file),cdn='https://cdn.jsdelivr.net/gh/'+GH_USER+'/'+repo+'@',L=[];
+  if(sha)L.push([cdn+sha+'/'+file,90000,'default']);
+  L.push(['https://'+GH_USER+'.github.io/'+repo+'/'+file+'?v='+Date.now(),45000]);
+  if(!sha)L.push([cdn+'main/'+file+'?v='+Math.floor(Date.now()/600000),90000]);
+  let last,all404=true;
+  for(const x of L){try{const ab=await ghTry(x[0],x[1],x[2]);ghGet.src=x[0];ghGet.sha=sha;return ab}catch(e){last=e;if(e.status!==404)all404=false;console.warn('[dados] falhou:',x[0],e&&e.message)}}
+  if(all404&&last)last.status=404;throw last}
+
+// download da base: versão exata pelo jsDelivr; se a cópia guardada neste computador já é dessa versão, nem baixa.
+// 3 tentativas; se tudo falhar, abre com a última base guardada (criptografada) e avisa.
+let BASE_SRC='online',BASE_AT=null,payP=null;
+const netMsg=e=>/failed to fetch|networkerror|load failed|abort/i.test(String(e&&e.message||e))?'sem conexão com o servidor':String(e&&e.message||e);
+async function fetchBase(){let last;
+  for(let t=0;t<3;t++){if(t)await new Promise(r=>setTimeout(r,[0,2000,5000][t]));
+    try{const sha=await ghSha('historico-manutencao','base.enc');
+      if(sha){const c=await IDB.get('cache_enc');if(c&&c.sha===sha&&c.ab&&c.ab.byteLength>1000){BASE_SRC='online';return c.ab}}
+      const ab=await ghGet('historico-manutencao','base.enc');if(ab.byteLength<1000)throw new Error('arquivo incompleto');
+      BASE_SRC='online';IDB.set('cache_enc',{ab:ab,at:Date.now(),sha:ghGet.sha||null});return ab}
+    catch(e){last=e;console.warn('base.enc, tentativa '+(t+1)+':',e)}}
+  const c=await IDB.get('cache_enc');if(c&&c.ab){BASE_SRC='cache';BASE_AT=c.at;return c.ab}
+  throw last}
+function loadPay(){payP=fetchBase().then(ab=>{const b=new Uint8Array(ab);PAY={salt:b.slice(0,16),iv:b.slice(16,28),ct:b.slice(28)};return PAY});payP.catch(()=>{});return payP}
+loadPay();
 const normU=u=>u.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 async function deriveKey(u,pw,salt){const m=await crypto.subtle.importKey('raw',new TextEncoder().encode(normU(u)+'\u0000'+pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:600000,hash:'SHA-256'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
 async function decB(key,iv,ct){return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct))}
@@ -1803,7 +1836,8 @@ $('lgForm').onsubmit=async e=>{
   if(!u||!pw){er.textContent='Informe usuário e senha.';return}
   if(!window.crypto||!crypto.subtle){er.textContent='Este navegador não suporta a criptografia necessária. Use Chrome ou Edge atualizados.';return}
   b.disabled=true;b.textContent='Verificando…';er.textContent='';
-  try{await payP}catch(err){b.disabled=false;b.textContent='Entrar';er.textContent='Não foi possível baixar a base: '+err.message+'. Verifique a internet e recarregue.';return}
+  try{await payP}catch(err){b.textContent='Tentando de novo…';
+    try{await loadPay()}catch(err2){b.disabled=false;b.textContent='Entrar';er.textContent='Não foi possível baixar a base ('+netMsg(err2)+'). Confira a internet e clique em Entrar de novo.';return}}
   let raw;
   try{const key=await deriveKey(u,pw,PAY.salt);raw=await decB(key,PAY.iv,PAY.ct);KEY=key}
   catch(err){b.disabled=false;b.textContent='Entrar';er.textContent='Usuário ou senha inválidos.';$('lgP').value='';$('lgP').focus();return}
@@ -1816,6 +1850,7 @@ async function enter(raw){
     let st=LOCCORE.unpack(await gunzip(raw));raw=null;
     IDB.del('base');IDB.del('base_enc'); // limpa cópias locais de versões antigas
     setStore(st);overlayOff();loadFloc();
+    if(BASE_SRC==='cache')toast('<b style="color:var(--amber)">Sem conexão com o servidor agora</b><br>Mostrando a última base baixada neste computador ('+new Date(BASE_AT).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'). Recarregue mais tarde para ver a base mais nova.',15000);
   }catch(e){overlay('Erro ao carregar: '+esc(e.message||e),true)}
 }
 $('btnOut').onclick=async()=>{try{sessionStorage.removeItem('loc-adm')}catch(e){}await IDB.del('lkey');location.reload()};
@@ -1830,7 +1865,9 @@ $('btnPub').onclick=async()=>{
 (async()=>{const showLg=()=>{const l=$('login');if(l){l.classList.remove('chk');$('lgU').focus()}};
   let k=null;try{k=await IDB.get('lkey')}catch(e){}
   if(!k||!window.crypto||!crypto.subtle)return showLg();
-  try{await payP;const raw=await decB(k,PAY.iv,PAY.ct);KEY=k;enter(raw)}catch(e){IDB.del('lkey');showLg()}
+  // falha de rede não apaga o login lembrado; só uma chave que não abre a base é descartada
+  try{await payP}catch(e){return showLg()}
+  try{const raw=await decB(k,PAY.iv,PAY.ct);KEY=k;enter(raw)}catch(e){IDB.del('lkey');showLg()}
 })();
 })();
 </script>
